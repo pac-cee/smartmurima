@@ -1,0 +1,2 @@
+# Trained model artifacts (*.pkl, *.joblib, *.keras) are placed here.
+# When absent, the inference services fall back to deterministic heuristic stubs.

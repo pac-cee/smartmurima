@@ -1,0 +1,61 @@
+# ---------- Node / Next.js (frontend) ----------
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+.pnpm-store/
+.pnp.*
+.yarn/
+
+# ---------- Python / Django (backend) ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+db.sqlite3
+db.sqlite3-journal
+
+# Django collected static & user media
+staticfiles/
+backend/staticfiles/
+media/
+backend/media/
+
+# ---------- ML artifacts (large binaries; regenerate with ml/train.py) ----------
+backend/ml/artifacts/*.json
+backend/ml/artifacts/*.pkl
+backend/ml/artifacts/*.joblib
+backend/ml/artifacts/*.keras
+backend/ml/artifacts/*.h5
+!backend/ml/artifacts/.gitkeep
+
+# ---------- Env & secrets ----------
+.env
+.env.*
+!.env.example
+frontend/.env.local
+
+# ---------- Editor / OS ----------
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.log
+
+# ---------- Docker / data volumes ----------
+infra/**/data/
+*.pid

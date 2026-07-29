@@ -1,0 +1,239 @@
+{
+  "app": {
+    "name": "SmartMurima",
+    "tagline": "Hinga wizeye"
+  },
+  "nav": {
+    "dashboard": "Imbonerahamwe",
+    "farms": "Imirima",
+    "fields": "Ibibanza",
+    "recommendations": "Inama",
+    "diseases": "Ubuzima bw' igihingwa",
+    "assistant": "Umufasha",
+    "alerts": "Imenyesha",
+    "reports": "Raporo",
+    "admin": "Ubuyobozi",
+    "settings": "Igenamiterere",
+    "sections": { "overview": "Incamake", "grow": "Guhinga", "manage": "Gucunga" }
+  },
+  "common": {
+    "loading": "Biratunganywa",
+    "save": "Bika impinduka",
+    "saved": "Byabitswe",
+    "cancel": "Hagarika",
+    "create": "Kora",
+    "delete": "Siba",
+    "edit": "Hindura",
+    "search": "Shakisha",
+    "retry": "Ongera ugerageze",
+    "back": "Subira inyuma",
+    "next": "Komeza",
+    "close": "Funga",
+    "confirm": "Emeza",
+    "viewAll": "Reba byose",
+    "seeDetails": "Reba birambuye",
+    "signOut": "Sohoka",
+    "confidence": "Icyizere",
+    "updated": "Byavuguruwe",
+    "all": "Byose",
+    "none": "Nta na kimwe",
+    "optional": "bidategetswe"
+  },
+  "errors": {
+    "generic": "Hari ikitagenze neza. Ongera ugerageze.",
+    "notFound": "Ntabwo tubibonye.",
+    "network": "Ntitwabashije kugera kuri seriveri. Reba interineti yawe.",
+    "boundaryTitle": "Uru rupapuro rwahuye n'ikibazo",
+    "boundaryBody": "Ibindi bice bya porogaramu biracyakora. Ushobora kongera gutangiza iki gice."
+  },
+  "empty": {
+    "farms": "Nta murima urahari",
+    "farmsBody": "Ongeraho umurima wawe wa mbere kugira ngo utangire gukurikirana ubutaka, ikirere n'ubuzima bw'ibihingwa.",
+    "fields": "Nta bibanza biri muri uyu murima",
+    "recommendations": "Nta nama irahari",
+    "recommendationsBody": "Saba inama ku kuhira, ifumbire cyangwa umusaruro w'ikibanza.",
+    "diseases": "Nta gusuzuma birakorwa",
+    "diseasesBody": "Ohereza ifoto y'ikibabi kugira ngo usuzume indwara.",
+    "alerts": "Nta menyesha rishya",
+    "alertsBody": "Imenyesha rijyanye n'ubwuzu, indwara n'ikirere rizagaragara hano.",
+    "messages": "Baza ikibazo cyawe cya mbere",
+    "messagesBody": "Baza ku gutera, kuhira, udukoko cyangwa igihe cyo kugurisha."
+  },
+  "auth": {
+    "loginTitle": "Murakaza neza",
+    "loginSubtitle": "Injira urebe ibibanza byawe.",
+    "registerTitle": "Fungura konti yawe",
+    "registerSubtitle": "Ifatanye n'abahinzi bahinga mu buryo bw'ubwenge muri Bugesera.",
+    "identifier": "Imeyili cyangwa telefoni",
+    "password": "Ijambobanga",
+    "fullName": "Amazina yombi",
+    "email": "Imeyili",
+    "phone": "Nimero ya telefoni",
+    "role": "Ndi",
+    "language": "Ururimi ukunda",
+    "signIn": "Injira",
+    "signUp": "Fungura konti",
+    "forgot": "Wibagiwe ijambobanga?",
+    "noAccount": "Uri mushya kuri SmartMurima?",
+    "haveAccount": "Usanzwe ufite konti?",
+    "createOne": "Fungura konti",
+    "otpTitle": "Andika kode yawe",
+    "otpSubtitle": "Twoherereje kode y'imibare 6 kuri {target}.",
+    "verify": "Emeza ukomeze",
+    "resendIn": "Ongera wohereze kode mu masegonda {seconds}",
+    "resend": "Ongera wohereze kode",
+    "resent": "Kode nshya iri kuza.",
+    "resetTitle": "Hindura ijambobanga",
+    "resetSubtitle": "Tuzakohereza kode yo kwemeza ko ari wowe.",
+    "sendCode": "Ohereza kode",
+    "newPassword": "Ijambobanga rishya",
+    "setPassword": "Shyiraho ijambobanga rishya",
+    "heroHeadline": "Buri kibanza, kirasobanutse.",
+    "heroBody": "Ubwuzu bw'ubutaka, ikirere, indwara z'ibihingwa n'inama mu rurimi rwawe — byakorewe abahinzi ba Bugesera.",
+    "roles": {
+      "farmer": "Umuhinzi",
+      "coop_admin": "Umuyobozi wa koperative",
+      "extension": "Umujyanama w'ubuhinzi",
+      "admin": "Umunyamabanga"
+    }
+  },
+  "dashboard": {
+    "greeting": "Muraho, {name}",
+    "subtitle": "Dore uko ibibanza byawe bimeze uyu munsi.",
+    "kpi": {
+      "soilMoisture": "Ubwuzu bw'ubutaka",
+      "temperature": "Ubushyuhe",
+      "humidity": "Ubuhehere",
+      "activeAlerts": "Imenyesha rikora"
+    },
+    "trend": "Imigendekere y'ibipimo",
+    "recFeed": "Inama za vuba",
+    "diseaseStrip": "Gusuzuma bya vuba",
+    "askTitle": "Baza umufasha",
+    "askBody": "Bona ubuyobozi bwihuse mu Kinyarwanda cyangwa Icyongereza.",
+    "openAssistant": "Fungura umufasha"
+  },
+  "range": { "24h": "amasaha 24", "7d": "iminsi 7", "30d": "iminsi 30" },
+  "sensors": {
+    "soil_moisture": "Ubwuzu bw'ubutaka",
+    "temperature": "Ubushyuhe",
+    "humidity": "Ubuhehere",
+    "rainfall": "Imvura",
+    "battery": "Batiri",
+    "lastSeen": "Iheruka kugaragara",
+    "online": "Irakora",
+    "offline": "Ntikora",
+    "history": "Amateka y'ibipimo",
+    "nodes": "Ibyuma bipima"
+  },
+  "farms": {
+    "title": "Imirima",
+    "subtitle": "Imirima yawe yanditse n'ibibanza byayo.",
+    "add": "Ongeraho umurima",
+    "newFarm": "Umurima mushya",
+    "name": "Izina ry'umurima",
+    "sector": "Umurenge",
+    "area": "Ubuso (hegitari)",
+    "latitude": "Latitude",
+    "longitude": "Longitude",
+    "fields": "Ibibanza",
+    "nodes": "Ibyuma",
+    "location": "Aho iherereye",
+    "fieldsCount": "ibibanza {count}",
+    "created": "Umurima warakozwe"
+  },
+  "fields": {
+    "title": "Ikibanza",
+    "crop": "Igihingwa",
+    "growthStage": "Icyiciro cy'imikurire",
+    "plantingDate": "Itariki yo gutera",
+    "add": "Ongeraho ikibanza",
+    "newField": "Ikibanza gishya",
+    "gauges": "Imimerere iriho",
+    "reports": "Gusuzuma"
+  },
+  "recommendations": {
+    "title": "Inama",
+    "subtitle": "Ubuyobozi bwa AI ku kuhira, ifumbire n'umusaruro.",
+    "request": "Saba inama",
+    "types": { "irrigation": "Kuhira", "fertilizer": "Ifumbire", "yield": "Umusaruro" },
+    "decision": "Icyemezo",
+    "details": "Impamvu y'iyi nama",
+    "runFor": "Bona inama kuri",
+    "history": "Amateka y'inama"
+  },
+  "diseases": {
+    "title": "Ubuzima bw'igihingwa",
+    "subtitle": "Ohereza ifoto y'ikibabi kugira ngo umenye indwara ubone n'umuti.",
+    "drop": "Shyira hano ifoto y'ikibabi",
+    "browse": "cyangwa kanda uhitemo ifoto",
+    "analyzing": "Gusesengura ikibabi…",
+    "healthy": "Kigaragara nk'igizima",
+    "detected": "Indwara yabonetse",
+    "treatment": "Umuti",
+    "scanAnother": "Suzuma ikindi",
+    "selectField": "Ikibanza kihe?",
+    "reports": "Amateka yo gusuzuma"
+  },
+  "assistant": {
+    "title": "Umufasha",
+    "subtitle": "Baza ku bihingwa byawe mu Kinyarwanda cyangwa Icyongereza.",
+    "placeholder": "Baza ikibazo…",
+    "send": "Ohereza",
+    "sources": "Inkomoko",
+    "thinking": "Aratekereza…",
+    "newChat": "Ikiganiro gishya",
+    "suggestions": {
+      "s1": "Ni ryari nkuhira ibishyimbo byanjye?",
+      "s2": "Nkora nte kugira ngo mvure indwara y'ibibabi by'ibigori?",
+      "s3": "Ni iyihe fumbire nziza kuri iki cyiciro cy'imikurire?"
+    }
+  },
+  "alerts": {
+    "title": "Imenyesha",
+    "subtitle": "Imenyesha rijyanye n'ibibanza byawe.",
+    "markRead": "Menya ko wasomye",
+    "unread": "Ritarasomwa",
+    "types": {
+      "low_moisture": "Ubwuzu buke bw'ubutaka",
+      "disease_risk": "Ibyago by'indwara",
+      "weather": "Ikirere",
+      "system": "Sisitemu"
+    }
+  },
+  "reports": {
+    "title": "Raporo",
+    "subtitle": "Incamake z'igihembwe no kohereza.",
+    "export": "Ohereza",
+    "exportPdf": "Ohereza PDF",
+    "exportCsv": "Ohereza CSV",
+    "from": "Kuva",
+    "to": "Kugeza",
+    "summary": "Incamake"
+  },
+  "admin": {
+    "title": "Ubuyobozi",
+    "subtitle": "Gucunga abakoresha, ibyuma bipima n'inyandiko z'ubumenyi.",
+    "tabs": { "users": "Abakoresha", "nodes": "Ibyuma bipima", "documents": "Ububiko bw'ubumenyi" },
+    "reembed": "Ongera ubike",
+    "addUser": "Ongeraho ukoresha",
+    "addDocument": "Ongeraho inyandiko"
+  },
+  "settings": {
+    "title": "Igenamiterere",
+    "subtitle": "Umwirondoro wawe, ururimi n'umutekano.",
+    "profile": "Umwirondoro",
+    "language": "Ururimi",
+    "security": "Umutekano",
+    "theme": "Isura",
+    "themeLight": "Urumuri",
+    "themeDark": "Umwijima",
+    "themeSystem": "Sisitemu",
+    "changePassword": "Hindura ijambobanga",
+    "currentPassword": "Ijambobanga rigezweho"
+  },
+  "weather": {
+    "title": "Ikirere",
+    "forecast": "Iteganyagihe"
+  }
+}

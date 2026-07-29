@@ -1,0 +1,138 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Green scale — the single hue */
+    --green-50: #ecfdf3;
+    --green-100: #d1fadf;
+    --green-200: #a6f4c5;
+    --green-300: #6ce9a6;
+    --green-400: #32d583;
+    --green-500: #12b76a;
+    --green-600: #16a34a;
+    --green-700: #15803d;
+    --green-800: #166534;
+    --green-900: #14532d;
+
+    /* Neutrals — white + black only */
+    --white: #ffffff;
+    --white-fixed: #ffffff;
+    --paper: #fbfdfb;
+    --surface: #ffffff;
+    --surface-muted: #f4f8f5;
+    --ink-900: #0a0f0c;
+    --ink-700: #2c332e;
+    --ink-500: #667065;
+    --line: #e4eae5;
+
+    --shadow-sm: 0 1px 2px rgba(20, 83, 45, 0.06);
+    --shadow-md: 0 6px 20px -6px rgba(20, 83, 45, 0.12);
+    --shadow-lg: 0 18px 40px -12px rgba(20, 83, 45, 0.18);
+
+    --radius: 16px;
+    --font-inter:
+      'Inter', 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  :root[data-theme='dark'] {
+    --paper: #0a0f0c;
+    --white: #10161a;
+    --surface: #101613;
+    --surface-muted: #141c17;
+    --ink-900: #f2f7f3;
+    --ink-700: #c4cdc6;
+    --ink-500: #8a948c;
+    --line: #1e2621;
+    /* green scale unchanged; green-500/600 read as the accent on black */
+  }
+
+  * {
+    border-color: var(--line);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--paper);
+    color: var(--ink-900);
+    font-feature-settings:
+      'cv11',
+      'ss01';
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Numbers in stats/dashboards */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.02em;
+    font-weight: 700;
+  }
+
+  /* Visible focus ring — 2px green-600 + 2px offset */
+  :where(a, button, input, textarea, select, [tabindex]):focus-visible {
+    outline: 2px solid var(--green-600);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: var(--green-100);
+    color: var(--green-900);
+  }
+
+  /* Slim, green-tinted scrollbars */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--line);
+    border-radius: 999px;
+    border: 2px solid var(--paper);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--green-300);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .grid-noise {
+    background-image: radial-gradient(var(--line) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+  /* Subtle field-rows motif used on auth hero */
+  .field-rows {
+    background-image: repeating-linear-gradient(
+      100deg,
+      transparent 0,
+      transparent 26px,
+      rgba(255, 255, 255, 0.05) 26px,
+      rgba(255, 255, 255, 0.05) 28px
+    );
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

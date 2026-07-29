@@ -1,0 +1,128 @@
+name: smartmurima
+
+services:
+  # PostgreSQL (latest) with pgvector for RAG embeddings.
+  # pgvector/pgvector:pg17 = current PostgreSQL major + pgvector preinstalled.
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: sm_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-smartmurima}
+      POSTGRES_USER: ${POSTGRES_USER:-smartmurima}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smartmurima}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./infra/db/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-smartmurima}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: sm_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@smartmurima.rw}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./infra/pgadmin/servers.json:/pgadmin4/servers.json:ro
+    ports:
+      - "5050:80"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Local LLM runtime for the RAG assistant (Llama 3.1 8B).
+  ollama:
+    image: ollama/ollama:latest
+    container_name: sm_ollama
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    # Uncomment to enable GPU:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices: [{ driver: nvidia, count: all, capabilities: [gpu] }]
+
+  # MQTT broker for ESP32 IoT telemetry.
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: sm_mqtt
+    restart: unless-stopped
+    volumes:
+      - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mqtt_data:/mosquitto/data
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+
+  backend:
+    build: ./backend
+    container_name: sm_backend
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./backend:/app
+      - media_data:/app/media
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3"
+
+  # MQTT->DB ingestion worker (same image as backend, different entrypoint).
+  ingestion:
+    build: ./backend
+    container_name: sm_ingestion
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - backend
+      - mqtt
+    command: python manage.py run_ingestion
+
+  # Frontend runs in dev mode against the LIVE backend API (mocks disabled), so
+  # the browser consumes real data end-to-end. Linux-native node_modules live in
+  # a named volume so host (macOS) binaries never leak into the container.
+  frontend:
+    image: node:20-alpine
+    container_name: sm_frontend
+    restart: unless-stopped
+    working_dir: /app
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+      NEXT_PUBLIC_API_MOCKING: ${NEXT_PUBLIC_API_MOCKING:-disabled}
+    volumes:
+      - ./frontend:/app
+      - fe_node_modules:/app/node_modules
+      - fe_next:/app/.next
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    command: sh -c "corepack enable && corepack prepare pnpm@9 --activate && pnpm install && pnpm dev -p 3000 -H 0.0.0.0"
+
+volumes:
+  db_data:
+  pgadmin_data:
+  ollama_data:
+  mqtt_data:
+  media_data:
+  fe_node_modules:
+  fe_next:

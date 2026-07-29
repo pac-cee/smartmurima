@@ -1,0 +1,32 @@
+# ---- Core web stack ----
+Django==4.2.16
+djangorestframework==3.14.0
+djangorestframework-simplejwt==5.3.1
+django-cors-headers==4.4.0
+django-environ==0.11.2
+drf-spectacular==0.27.2
+gunicorn==22.0.0
+psycopg[binary]==3.2.3
+
+# ---- Vector / RAG ----
+pgvector==0.3.6
+requests==2.32.3
+
+# ---- IoT ----
+paho-mqtt==2.1.0
+
+# ---- ML (optional at runtime: services degrade to stubs if absent) ----
+numpy==1.26.4
+scikit-learn==1.5.2
+xgboost==2.1.1
+joblib==1.4.2
+# TensorFlow is heavy; disease CNN falls back to a stub when it is not installed.
+# tensorflow-cpu==2.16.1
+Pillow==10.4.0
+
+# ---- Reports ----
+reportlab==4.2.2
+
+# ---- Testing ----
+pytest==8.3.3
+pytest-django==4.9.0

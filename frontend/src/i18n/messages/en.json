@@ -1,0 +1,239 @@
+{
+  "app": {
+    "name": "SmartMurima",
+    "tagline": "Grow with confidence"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "farms": "Farms",
+    "fields": "Fields",
+    "recommendations": "Advice",
+    "diseases": "Crop health",
+    "assistant": "Assistant",
+    "alerts": "Alerts",
+    "reports": "Reports",
+    "admin": "Admin",
+    "settings": "Settings",
+    "sections": { "overview": "Overview", "grow": "Grow", "manage": "Manage" }
+  },
+  "common": {
+    "loading": "Loading",
+    "save": "Save changes",
+    "saved": "Saved",
+    "cancel": "Cancel",
+    "create": "Create",
+    "delete": "Delete",
+    "edit": "Edit",
+    "search": "Search",
+    "retry": "Try again",
+    "back": "Back",
+    "next": "Next",
+    "close": "Close",
+    "confirm": "Confirm",
+    "viewAll": "View all",
+    "seeDetails": "See details",
+    "signOut": "Sign out",
+    "confidence": "Confidence",
+    "updated": "Updated",
+    "all": "All",
+    "none": "None",
+    "optional": "optional"
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "notFound": "We couldn't find that.",
+    "network": "Can't reach the server. Check your connection.",
+    "boundaryTitle": "This screen ran into a problem",
+    "boundaryBody": "The rest of the app is still working. You can reload this section."
+  },
+  "empty": {
+    "farms": "No farms yet",
+    "farmsBody": "Add your first farm to start tracking soil, weather, and crop health.",
+    "fields": "No fields in this farm",
+    "recommendations": "No advice yet",
+    "recommendationsBody": "Request irrigation, fertilizer, or yield advice for a field.",
+    "diseases": "No crop scans yet",
+    "diseasesBody": "Upload a leaf photo to check for disease.",
+    "alerts": "You're all caught up",
+    "alertsBody": "New alerts about moisture, disease, and weather will appear here.",
+    "messages": "Ask your first question",
+    "messagesBody": "Ask about planting, irrigation, pests, or market timing."
+  },
+  "auth": {
+    "loginTitle": "Welcome back",
+    "loginSubtitle": "Sign in to check your fields.",
+    "registerTitle": "Create your account",
+    "registerSubtitle": "Join farmers growing smarter across Bugesera.",
+    "identifier": "Email or phone",
+    "password": "Password",
+    "fullName": "Full name",
+    "email": "Email",
+    "phone": "Phone number",
+    "role": "I am a",
+    "language": "Preferred language",
+    "signIn": "Sign in",
+    "signUp": "Create account",
+    "forgot": "Forgot password?",
+    "noAccount": "New to SmartMurima?",
+    "haveAccount": "Already have an account?",
+    "createOne": "Create an account",
+    "otpTitle": "Enter your code",
+    "otpSubtitle": "We sent a 6-digit code to {target}.",
+    "verify": "Verify and continue",
+    "resendIn": "Resend code in {seconds}s",
+    "resend": "Resend code",
+    "resent": "A new code is on its way.",
+    "resetTitle": "Reset your password",
+    "resetSubtitle": "We'll send a code to confirm it's you.",
+    "sendCode": "Send code",
+    "newPassword": "New password",
+    "setPassword": "Set new password",
+    "heroHeadline": "Every field, understood.",
+    "heroBody": "Soil moisture, weather, crop disease, and advice in your language — built for Bugesera's farmers.",
+    "roles": {
+      "farmer": "Farmer",
+      "coop_admin": "Cooperative admin",
+      "extension": "Extension officer",
+      "admin": "Administrator"
+    }
+  },
+  "dashboard": {
+    "greeting": "Muraho, {name}",
+    "subtitle": "Here's how your fields are doing today.",
+    "kpi": {
+      "soilMoisture": "Soil moisture",
+      "temperature": "Temperature",
+      "humidity": "Humidity",
+      "activeAlerts": "Active alerts"
+    },
+    "trend": "Sensor trends",
+    "recFeed": "Latest advice",
+    "diseaseStrip": "Recent crop scans",
+    "askTitle": "Ask the assistant",
+    "askBody": "Get instant guidance in Kinyarwanda or English.",
+    "openAssistant": "Open assistant"
+  },
+  "range": { "24h": "24h", "7d": "7 days", "30d": "30 days" },
+  "sensors": {
+    "soil_moisture": "Soil moisture",
+    "temperature": "Temperature",
+    "humidity": "Humidity",
+    "rainfall": "Rainfall",
+    "battery": "Battery",
+    "lastSeen": "Last seen",
+    "online": "Online",
+    "offline": "Offline",
+    "history": "Reading history",
+    "nodes": "Sensor nodes"
+  },
+  "farms": {
+    "title": "Farms",
+    "subtitle": "Your registered farms and their fields.",
+    "add": "Add farm",
+    "newFarm": "New farm",
+    "name": "Farm name",
+    "sector": "Sector",
+    "area": "Area (hectares)",
+    "latitude": "Latitude",
+    "longitude": "Longitude",
+    "fields": "Fields",
+    "nodes": "Nodes",
+    "location": "Location",
+    "fieldsCount": "{count} fields",
+    "created": "Farm created"
+  },
+  "fields": {
+    "title": "Field",
+    "crop": "Crop",
+    "growthStage": "Growth stage",
+    "plantingDate": "Planting date",
+    "add": "Add field",
+    "newField": "New field",
+    "gauges": "Live conditions",
+    "reports": "Crop scans"
+  },
+  "recommendations": {
+    "title": "Advice",
+    "subtitle": "AI guidance on irrigation, fertilizer, and yield.",
+    "request": "Request advice",
+    "types": { "irrigation": "Irrigation", "fertilizer": "Fertilizer", "yield": "Yield" },
+    "decision": "Decision",
+    "details": "Why this advice",
+    "runFor": "Get advice for",
+    "history": "Advice history"
+  },
+  "diseases": {
+    "title": "Crop health",
+    "subtitle": "Upload a leaf photo to detect disease and get treatment.",
+    "drop": "Drop a leaf photo here",
+    "browse": "or tap to choose a photo",
+    "analyzing": "Analyzing leaf…",
+    "healthy": "Looks healthy",
+    "detected": "Disease detected",
+    "treatment": "Treatment",
+    "scanAnother": "Scan another",
+    "selectField": "For which field?",
+    "reports": "Scan history"
+  },
+  "assistant": {
+    "title": "Assistant",
+    "subtitle": "Ask about your crops in Kinyarwanda or English.",
+    "placeholder": "Ask a question…",
+    "send": "Send",
+    "sources": "Sources",
+    "thinking": "Thinking…",
+    "newChat": "New chat",
+    "suggestions": {
+      "s1": "When should I irrigate my beans?",
+      "s2": "How do I treat maize leaf blight?",
+      "s3": "Best fertilizer for this growth stage?"
+    }
+  },
+  "alerts": {
+    "title": "Alerts",
+    "subtitle": "Notifications about your fields.",
+    "markRead": "Mark as read",
+    "unread": "Unread",
+    "types": {
+      "low_moisture": "Low soil moisture",
+      "disease_risk": "Disease risk",
+      "weather": "Weather",
+      "system": "System"
+    }
+  },
+  "reports": {
+    "title": "Reports",
+    "subtitle": "Season summaries and exports.",
+    "export": "Export",
+    "exportPdf": "Export PDF",
+    "exportCsv": "Export CSV",
+    "from": "From",
+    "to": "To",
+    "summary": "Summary"
+  },
+  "admin": {
+    "title": "Admin",
+    "subtitle": "Manage users, sensor nodes, and knowledge documents.",
+    "tabs": { "users": "Users", "nodes": "Sensor nodes", "documents": "Knowledge base" },
+    "reembed": "Re-embed",
+    "addUser": "Add user",
+    "addDocument": "Add document"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Your profile, language, and security.",
+    "profile": "Profile",
+    "language": "Language",
+    "security": "Security",
+    "theme": "Appearance",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
+    "changePassword": "Change password",
+    "currentPassword": "Current password"
+  },
+  "weather": {
+    "title": "Weather",
+    "forecast": "Forecast"
+  }
+}
