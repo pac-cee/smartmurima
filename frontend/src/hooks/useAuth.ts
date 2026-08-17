@@ -9,6 +9,7 @@ import {
   otpChallengeSchema,
   userSchema,
   type AuthResult,
+  type ChangePasswordInput,
   type LoginInput,
   type OtpChallenge,
   type OtpVerifyInput,
@@ -110,6 +111,12 @@ export function useUpdateProfile() {
       tokenStore.setUser(user);
       void qc.invalidateQueries({ queryKey: ['me'] });
     },
+  });
+}
+
+export function useChangePassword() {
+  return useMutation<unknown, Error, ChangePasswordInput>({
+    mutationFn: (input) => api.post('/auth/password/change', input),
   });
 }
 

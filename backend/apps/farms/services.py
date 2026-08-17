@@ -80,6 +80,13 @@ class SensorNodeService(BaseService):
     def create(self, data: dict):
         return self.repo.create(**data)
 
+    def create_for_user(self, user, data: dict):
+        field = data.get("field")
+        if field is None:
+            raise NotFoundError("Field is required.")
+        _ensure_access(user, field.farm.farmer)
+        return self.repo.create(**data)
+
 
 def _ensure_access(user, owner):
     if user.is_superuser or user.role in ("admin", "extension", "coop_admin"):

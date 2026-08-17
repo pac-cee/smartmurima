@@ -27,7 +27,7 @@ from core.exceptions import (
 )
 from core.services import BaseService
 
-from .models import OtpPurpose, User
+from .models import OtpPurpose, Role, User
 from .repositories import FarmerRepository, OtpRepository, UserRepository
 
 logger = logging.getLogger("smartmurima")
@@ -250,20 +250,26 @@ class AuthService(BaseService):
         if phone and self.user_repo.get_by_phone(phone):
             raise ConflictError("An account with this phone number already exists.")
 
+        # Self-service registration always creates a FARMER. Non-farmer roles
+        # (coop_admin/extension/admin) are provisioned only via Django admin,
+        # the admin-api, or ``createsuperuser`` -- never from this endpoint.
         user = self.user_repo.create(
             username=self._derive_username(email, phone),
             email=email,
             phone_number=phone,
             full_name=data["full_name"],
-            role=data.get("role", "farmer"),
+            role=Role.FARMER,
             language=data.get("language", "rw"),
             is_active=False,
         )
         user.set_password(data["password"])
         user.save(update_fields=["password"])
 
-        if user.role == "farmer":
-            self.farmer_repo.get_or_create(user=user)
+        farmer, _ = self.farmer_repo.get_or_create(user=user)
+        # Optional location the farmer is connected to (sector level).
+        location = data.get("location")
+        if location is not None:
+            self.farmer_repo.update(farmer, location=location)
 
         identifier = phone or email
         return self.otp_service.issue(identifier, OtpPurpose.REGISTER, user=user)
@@ -304,13 +310,27 @@ class AuthService(BaseService):
         user.save(update_fields=["password", "is_active"])
         return user
 
+    def change_password(
+        self, user: User, old_password: str, new_password: str
+    ) -> User:
+        if not user.check_password(old_password):
+            raise ValidationError({"old_password": ["Current password is incorrect."]})
+        user.set_password(new_password)
+        user.save(update_fields=["password"])
+        return user
+
     def resend_otp(self, identifier: str, purpose: str) -> OtpIssueResult:
         user = self.user_repo.get_by_identifier(identifier)
         return self.otp_service.issue(identifier, purpose, user=user)
 
     def update_profile(self, user: User, data: dict) -> User:
+        # ``location`` lives on the Farmer profile, not the User row.
+        if "location" in data:
+            farmer, _ = self.farmer_repo.get_or_create(user=user)
+            self.farmer_repo.update(farmer, location=data["location"])
+
         allowed = {"full_name", "language", "email", "phone_number"}
         updates = {k: v for k, v in data.items() if k in allowed}
-        if not updates:
-            return user
-        return self.user_repo.update(user, **updates)
+        if updates:
+            user = self.user_repo.update(user, **updates)
+        return user

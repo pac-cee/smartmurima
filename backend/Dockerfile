@@ -6,12 +6,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# System deps for psycopg, Pillow, reportlab, and ML wheels.
+# All Python deps ship prebuilt arm64/x86_64 wheels (psycopg[binary], numpy,
+# scikit-learn, xgboost, Pillow), so no compiler/-dev headers are needed.
+# Only curl is kept, for container healthchecks.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential \
-        libpq-dev \
-        libjpeg-dev \
-        zlib1g-dev \
         curl \
     && rm -rf /var/lib/apt/lists/*
 

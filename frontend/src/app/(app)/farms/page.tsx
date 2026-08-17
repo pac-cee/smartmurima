@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { Layers, Loader2, MapPin, MapPinned, Plus, Radio } from 'lucide-react';
 import { toast } from 'sonner';
 import { EmptyState } from '@/components/EmptyState';
+import { LocationPicker } from '@/components/LocationPicker';
 import { PageHeader } from '@/components/PageHeader';
 import { ListSkeleton } from '@/components/Skeletons';
 import { Button } from '@/components/ui/button';
@@ -29,6 +30,7 @@ function CreateFarmDialog() {
   const t = useTranslations('farms');
   const tc = useTranslations('common');
   const [open, setOpen] = useState(false);
+  const [location, setLocation] = useState<string | undefined>(undefined);
   const create = useCreateFarm();
   const {
     register,
@@ -41,13 +43,17 @@ function CreateFarmDialog() {
   });
 
   const onSubmit = (values: FarmInput) => {
-    create.mutate(values, {
-      onSuccess: () => {
-        toast.success(t('created'));
-        setOpen(false);
-        reset();
+    create.mutate(
+      { ...values, location },
+      {
+        onSuccess: () => {
+          toast.success(t('created'));
+          setOpen(false);
+          reset();
+          setLocation(undefined);
+        },
       },
-    });
+    );
   };
 
   return (
@@ -70,6 +76,12 @@ function CreateFarmDialog() {
           <div className="space-y-1.5">
             <Label htmlFor="sector">{t('sector')}</Label>
             <Input id="sector" placeholder="Rweru" {...register('sector')} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>
+              {t('location')} <span className="text-ink-500">({tc('optional')})</span>
+            </Label>
+            <LocationPicker value={location} onChange={setLocation} />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">

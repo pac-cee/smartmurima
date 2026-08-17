@@ -5,8 +5,8 @@ import {
   Leaf,
   MapPinned,
   MessageCircle,
+  Radio,
   Settings,
-  ShieldCheck,
   Sprout,
   Stethoscope,
   type LucideIcon,
@@ -24,18 +24,12 @@ export type NavItem = {
 export const navItems: NavItem[] = [
   { href: '/dashboard', labelKey: 'dashboard', icon: LayoutDashboard, section: 'overview' },
   { href: '/farms', labelKey: 'farms', icon: MapPinned, section: 'overview' },
+  { href: '/sensors', labelKey: 'sensors', icon: Radio, section: 'overview' },
   { href: '/recommendations', labelKey: 'recommendations', icon: Sprout, section: 'grow' },
   { href: '/diseases', labelKey: 'diseases', icon: Stethoscope, section: 'grow' },
   { href: '/assistant', labelKey: 'assistant', icon: MessageCircle, section: 'grow' },
   { href: '/alerts', labelKey: 'alerts', icon: Bell, section: 'manage' },
   { href: '/reports', labelKey: 'reports', icon: FileBarChart, section: 'manage' },
-  {
-    href: '/admin',
-    labelKey: 'admin',
-    icon: ShieldCheck,
-    section: 'manage',
-    roles: ['admin', 'coop_admin'],
-  },
   { href: '/settings', labelKey: 'settings', icon: Settings, section: 'manage' },
 ];
 

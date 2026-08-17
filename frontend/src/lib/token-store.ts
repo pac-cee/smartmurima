@@ -1,13 +1,17 @@
 import type { User } from './schemas';
 
 /**
- * Access token lives in memory only. The refresh token is persisted so a page
- * reload can silently re-authenticate. A tiny pub/sub lets React subscribe.
+ * Both tokens are persisted so a hard reload can render authenticated data on
+ * first paint without a 401->refresh round-trip; the refresh flow remains the
+ * fallback when the stored access token has expired. A tiny pub/sub lets React
+ * subscribe.
  */
+const ACCESS_KEY = 'sm_access';
 const REFRESH_KEY = 'sm_refresh';
 const USER_KEY = 'sm_user';
 
-let accessToken: string | null = null;
+let accessToken: string | null =
+  typeof window === 'undefined' ? null : window.localStorage.getItem(ACCESS_KEY);
 let currentUser: User | null = null;
 const listeners = new Set<() => void>();
 
@@ -34,6 +38,7 @@ export const tokenStore = {
   setSession(access: string, refresh: string, user?: User) {
     accessToken = access;
     if (typeof window !== 'undefined') {
+      window.localStorage.setItem(ACCESS_KEY, access);
       window.localStorage.setItem(REFRESH_KEY, refresh);
       if (user) window.localStorage.setItem(USER_KEY, JSON.stringify(user));
     }
@@ -42,6 +47,9 @@ export const tokenStore = {
   },
   setAccess(access: string) {
     accessToken = access;
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(ACCESS_KEY, access);
+    }
     emit();
   },
   setUser(user: User) {
@@ -55,6 +63,7 @@ export const tokenStore = {
     accessToken = null;
     currentUser = null;
     if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(ACCESS_KEY);
       window.localStorage.removeItem(REFRESH_KEY);
       window.localStorage.removeItem(USER_KEY);
     }

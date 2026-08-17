@@ -8,25 +8,25 @@ import {
   Droplets,
   Gauge,
   MessageCircle,
-  Sprout,
+  Stethoscope,
   Thermometer,
   Waves,
 } from 'lucide-react';
+import { AdviceFeed } from '@/components/AdviceFeed';
 import { AlertItem } from '@/components/AlertItem';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { RecommendationCard } from '@/components/RecommendationCard';
 import { SensorStatus } from '@/components/SensorStatus';
 import { SensorTrendChart } from '@/components/SensorTrendChart';
 import { useSelection } from '@/components/selection-context';
-import { CardSkeleton, ListSkeleton, StatRowSkeleton } from '@/components/Skeletons';
+import { ListSkeleton, StatRowSkeleton } from '@/components/Skeletons';
 import { StatTile } from '@/components/StatTile';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAlerts } from '@/hooks/useAlerts';
 import { useDiseaseReports } from '@/hooks/useDiseaseDetect';
 import { useFields } from '@/hooks/useFields';
-import { useRecommendations } from '@/hooks/useRecommendations';
 import { useLatestReading } from '@/hooks/useSensorReadings';
 import { useSession } from '@/hooks/useAuth';
 
@@ -34,17 +34,15 @@ export default function DashboardPage() {
   const t = useTranslations('dashboard');
   const tc = useTranslations('common');
   const ta = useTranslations('alerts');
+  const te = useTranslations('empty');
   const { user } = useSession();
   const { farmId, fieldId } = useSelection();
   const { data: fields } = useFields(farmId ?? undefined);
   const effectiveField = fieldId ?? fields?.[0]?.id;
 
   const { data: latest, isLoading: latestLoading } = useLatestReading(effectiveField);
-  const { data: recs, isLoading: recsLoading } = useRecommendations(
-    fieldId ? { field: fieldId } : undefined,
-  );
   const { data: alerts, isLoading: alertsLoading } = useAlerts();
-  const { data: scans } = useDiseaseReports();
+  const { data: scans, isLoading: scansLoading } = useDiseaseReports();
   const unread = alerts?.filter((a) => !a.is_read).length ?? 0;
 
   const firstName = user?.full_name?.split(' ')[0] ?? 'Umuhinzi';
@@ -72,8 +70,6 @@ export default function DashboardPage() {
             value={latest.soil_moisture}
             unit="%"
             decimals={1}
-            delta={2}
-            deltaLabel="%"
           />
           <StatTile
             icon={Thermometer}
@@ -81,8 +77,6 @@ export default function DashboardPage() {
             value={latest.temperature ?? 0}
             unit="°C"
             decimals={1}
-            delta={1}
-            deltaLabel="°"
           />
           <StatTile
             icon={Waves}
@@ -90,8 +84,6 @@ export default function DashboardPage() {
             value={latest.humidity ?? 0}
             unit="%"
             decimals={0}
-            delta={-3}
-            deltaLabel="%"
           />
           <StatTile icon={Bell} label={t('kpi.activeAlerts')} value={unread} />
         </div>
@@ -121,14 +113,13 @@ export default function DashboardPage() {
               </Link>
             </Button>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {recsLoading ? (
-              <CardSkeleton lines={4} />
-            ) : recs && recs.length > 0 ? (
-              recs.slice(0, 2).map((rec) => <RecommendationCard key={rec.id} rec={rec} />)
-            ) : (
-              <EmptyState icon={Sprout} title={t('recFeed')} />
-            )}
+          <CardContent>
+            <AdviceFeed
+              fieldId={effectiveField}
+              limit={2}
+              stacked
+              showTimestamp={false}
+            />
           </CardContent>
         </Card>
       </div>
@@ -144,28 +135,47 @@ export default function DashboardPage() {
           </Button>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4 overflow-x-auto pb-1">
-            {(scans ?? []).map((scan) => (
-              <div
-                key={scan.id}
-                className="w-56 shrink-0 overflow-hidden rounded-tile border border-line"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={scan.image_url ?? undefined}
-                  alt={scan.disease}
-                  className="h-28 w-full object-cover"
-                />
-                <div className="p-3">
-                  <p className="truncate text-sm font-semibold text-ink-900">{scan.disease}</p>
-                  <p className="text-xs text-ink-500">{scan.field_name}</p>
-                  <p className="mt-1 tabular text-xs font-medium text-green-700">
-                    {Math.round(scan.confidence * 100)}% {tc('confidence').toLowerCase()}
-                  </p>
+          {scansLoading ? (
+            <div className="flex gap-4 overflow-x-auto pb-1">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="w-56 shrink-0 overflow-hidden rounded-tile border border-line"
+                >
+                  <Skeleton className="h-28 w-full rounded-none" />
+                  <div className="space-y-2 p-3">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : scans && scans.length > 0 ? (
+            <div className="flex gap-4 overflow-x-auto pb-1">
+              {scans.map((scan) => (
+                <div
+                  key={scan.id}
+                  className="w-56 shrink-0 overflow-hidden rounded-tile border border-line"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={scan.image_url ?? undefined}
+                    alt={scan.disease}
+                    className="h-28 w-full object-cover"
+                  />
+                  <div className="p-3">
+                    <p className="truncate text-sm font-semibold text-ink-900">{scan.disease}</p>
+                    <p className="text-xs text-ink-500">{scan.field_name}</p>
+                    <p className="mt-1 tabular text-xs font-medium text-green-700">
+                      {Math.round(scan.confidence * 100)}% {tc('confidence').toLowerCase()}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState icon={Stethoscope} title={te('diseases')} description={te('diseasesBody')} />
+          )}
         </CardContent>
       </Card>
 

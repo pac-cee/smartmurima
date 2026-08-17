@@ -12,14 +12,17 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Download, Droplets, FileText, Sprout, Thermometer } from 'lucide-react';
+import { useState } from 'react';
+import { Download, FileBarChart, FileText, Droplets, Sprout, Thermometer } from 'lucide-react';
+import { toast } from 'sonner';
+import { EmptyState } from '@/components/EmptyState';
 import { PageHeader } from '@/components/PageHeader';
 import { useSelection } from '@/components/selection-context';
 import { ChartSkeleton, StatRowSkeleton } from '@/components/Skeletons';
 import { StatTile } from '@/components/StatTile';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { reportExportUrl, useReportSummary } from '@/hooks/useReports';
+import { downloadReportExport, useReportSummary } from '@/hooks/useReports';
 
 const axisTick = { fill: 'var(--ink-500)', fontSize: 11 };
 
@@ -27,6 +30,19 @@ export default function ReportsPage() {
   const t = useTranslations('reports');
   const { farmId } = useSelection();
   const { data, isLoading } = useReportSummary(farmId ?? undefined);
+  const [exporting, setExporting] = useState<'pdf' | 'csv' | null>(null);
+
+  const handleExport = async (format: 'pdf' | 'csv') => {
+    if (!farmId) return;
+    setExporting(format);
+    try {
+      await downloadReportExport(format, farmId);
+    } catch {
+      toast.error(t('exportFailed'));
+    } finally {
+      setExporting(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -36,22 +52,29 @@ export default function ReportsPage() {
         action={
           farmId && (
             <>
-              <Button variant="outline" size="sm" asChild>
-                <a href={reportExportUrl('csv', farmId)} download>
-                  <Download className="size-4" /> {t('exportCsv')}
-                </a>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleExport('csv')}
+                disabled={exporting !== null}
+              >
+                <Download className="size-4" /> {t('exportCsv')}
               </Button>
-              <Button size="sm" asChild>
-                <a href={reportExportUrl('pdf', farmId)} download>
-                  <FileText className="size-4" /> {t('exportPdf')}
-                </a>
+              <Button size="sm" onClick={() => handleExport('pdf')} disabled={exporting !== null}>
+                <FileText className="size-4" /> {t('exportPdf')}
               </Button>
             </>
           )
         }
       />
 
-      {isLoading || !data ? (
+      {!farmId ? (
+        <EmptyState
+          icon={FileBarChart}
+          title={t('selectFarm')}
+          description={t('selectFarmBody')}
+        />
+      ) : isLoading || !data ? (
         <>
           <StatRowSkeleton />
           <ChartSkeleton />

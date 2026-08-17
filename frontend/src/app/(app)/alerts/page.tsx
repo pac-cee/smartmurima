@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { BellOff } from 'lucide-react';
+import { BellOff, CheckCheck } from 'lucide-react';
 import { AlertItem } from '@/components/AlertItem';
 import { EmptyState } from '@/components/EmptyState';
 import { PageHeader } from '@/components/PageHeader';
 import { ListSkeleton } from '@/components/Skeletons';
-import { useAlerts } from '@/hooks/useAlerts';
+import { Button } from '@/components/ui/button';
+import { useAlerts, useMarkAlertRead } from '@/hooks/useAlerts';
 import { cn } from '@/lib/utils';
 
 export default function AlertsPage() {
@@ -16,6 +17,12 @@ export default function AlertsPage() {
   const te = useTranslations('empty');
   const [unreadOnly, setUnreadOnly] = useState(false);
   const { data: alerts, isLoading } = useAlerts(unreadOnly);
+  const markRead = useMarkAlertRead();
+
+  const unread = alerts?.filter((a) => !a.is_read) ?? [];
+  const markAllRead = () => {
+    unread.forEach((a) => markRead.mutate(a.id));
+  };
 
   return (
     <div>
@@ -23,7 +30,18 @@ export default function AlertsPage() {
         title={t('title')}
         subtitle={t('subtitle')}
         action={
-          <div className="inline-flex rounded-control border border-line p-0.5">
+          <div className="flex items-center gap-2">
+            {unread.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={markAllRead}
+                disabled={markRead.isPending}
+              >
+                <CheckCheck className="size-4" /> {t('markAllRead')}
+              </Button>
+            )}
+            <div className="inline-flex rounded-control border border-line p-0.5">
             <button
               onClick={() => setUnreadOnly(false)}
               className={cn(
@@ -42,6 +60,7 @@ export default function AlertsPage() {
             >
               {t('unread')}
             </button>
+            </div>
           </div>
         }
       />

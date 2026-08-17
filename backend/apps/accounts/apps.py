@@ -6,3 +6,6 @@ class AccountsConfig(AppConfig):
     name = "apps.accounts"
     label = "accounts"
     verbose_name = "Accounts & Auth"
+
+    def ready(self):
+        from . import signals  # noqa: F401  (register post_save receiver)

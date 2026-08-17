@@ -12,6 +12,9 @@ class CropSerializer(serializers.ModelSerializer):
 
 class FarmSerializer(serializers.ModelSerializer):
     field_count = serializers.IntegerField(source="fields.count", read_only=True)
+    location_name = serializers.CharField(
+        source="location.name", read_only=True, default=None
+    )
 
     class Meta:
         model = Farm
@@ -20,13 +23,15 @@ class FarmSerializer(serializers.ModelSerializer):
             "farmer",
             "name",
             "sector",
+            "location",
+            "location_name",
             "latitude",
             "longitude",
             "area_hectares",
             "field_count",
             "created_at",
         ]
-        read_only_fields = ["id", "farmer", "created_at", "field_count"]
+        read_only_fields = ["id", "farmer", "created_at", "field_count", "location_name"]
 
 
 class FieldSerializer(serializers.ModelSerializer):

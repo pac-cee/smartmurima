@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 
 type Selection = {
   farmId: string | null;
@@ -14,14 +14,16 @@ const SelectionContext = createContext<Selection | null>(null);
 const FARM_KEY = 'sm_farm';
 const FIELD_KEY = 'sm_field';
 
-export function SelectionProvider({ children }: { children: ReactNode }) {
-  const [farmId, setFarmId] = useState<string | null>(null);
-  const [fieldId, setFieldId] = useState<string | null>(null);
+// Read synchronously so sensor queries can fire on the first paint instead of
+// waiting for an effect (which would create a farm->field->readings waterfall).
+function readStored(key: string): string | null {
+  if (typeof window === 'undefined') return null;
+  return window.localStorage.getItem(key);
+}
 
-  useEffect(() => {
-    setFarmId(window.localStorage.getItem(FARM_KEY));
-    setFieldId(window.localStorage.getItem(FIELD_KEY));
-  }, []);
+export function SelectionProvider({ children }: { children: ReactNode }) {
+  const [farmId, setFarmId] = useState<string | null>(() => readStored(FARM_KEY));
+  const [fieldId, setFieldId] = useState<string | null>(() => readStored(FIELD_KEY));
 
   const value = useMemo<Selection>(
     () => ({

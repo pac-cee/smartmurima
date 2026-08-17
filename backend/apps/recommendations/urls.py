@@ -11,6 +11,11 @@ urlpatterns = [
         name="recommendations",
     ),
     path(
+        "recommendations/latest",
+        RecommendationViewSet.as_view({"get": "latest"}),
+        name="recommendation-latest",
+    ),
+    path(
         "recommendations/irrigation",
         RecommendationViewSet.as_view({"post": "irrigation"}),
         name="recommendation-irrigation",

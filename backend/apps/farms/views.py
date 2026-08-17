@@ -66,3 +66,9 @@ class SensorNodeViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return SensorNodeService().list_for_user(self.request.user)
+
+    def perform_create(self, serializer):
+        node = SensorNodeService().create_for_user(
+            self.request.user, serializer.validated_data
+        )
+        serializer.instance = node

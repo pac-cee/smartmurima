@@ -7,6 +7,7 @@ import {
   mockDocuments,
   mockFarms,
   mockFields,
+  mockLocations,
   mockMessages,
   mockNodes,
   mockRecommendations,
@@ -20,7 +21,7 @@ import type {
   DiseaseReport,
   Farm,
   Field,
-  Recommendation,
+  SensorNode,
 } from '@/lib/schemas';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1';
@@ -32,6 +33,7 @@ const fields = [...mockFields];
 const alerts: Alert[] = [...mockAlerts];
 const recommendations = [...mockRecommendations];
 const diseaseReports = [...mockDiseaseReports];
+const nodes: SensorNode[] = [...mockNodes];
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const ACCESS = 'mock-access-token';
@@ -74,6 +76,21 @@ export const handlers = [
   http.patch(u('/auth/me'), async ({ request }) => {
     const patch = (await request.json()) as Record<string, unknown>;
     return HttpResponse.json({ ...mockUser, ...patch });
+  }),
+  http.post(u('/auth/password/change'), async ({ request }) => {
+    const { old_password } = (await request.json()) as {
+      old_password?: string;
+      new_password?: string;
+    };
+    // Demo rule: the mock "current" password is `password`. Anything else
+    // surfaces the same field error shape the real backend returns.
+    if (old_password !== 'password') {
+      return HttpResponse.json(
+        { errors: { old_password: ['Current password is incorrect.'] } },
+        { status: 400 },
+      );
+    }
+    return new HttpResponse(null, { status: 204 });
   }),
 
   /* ---------- farms ---------- */
@@ -124,15 +141,77 @@ export const handlers = [
     const field = fields.find((f) => f.id === params.id);
     return field ? HttpResponse.json(field) : new HttpResponse(null, { status: 404 });
   }),
+  http.patch(u('/fields/:id'), async ({ params, request }) => {
+    const patch = (await request.json()) as Partial<Field>;
+    const idx = fields.findIndex((f) => f.id === params.id);
+    if (idx === -1) return new HttpResponse(null, { status: 404 });
+    const crop = patch.crop ? mockCrops.find((c) => c.id === patch.crop) : undefined;
+    fields[idx] = {
+      ...fields[idx]!,
+      ...patch,
+      ...(crop ? { crop_name: crop.name } : {}),
+    };
+    return HttpResponse.json(fields[idx]);
+  }),
+  http.delete(u('/fields/:id'), ({ params }) => {
+    const idx = fields.findIndex((f) => f.id === params.id);
+    if (idx !== -1) fields.splice(idx, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
 
   /* ---------- crops ---------- */
   http.get(u('/crops'), () => HttpResponse.json(page(mockCrops))),
 
+  /* ---------- locations (public read) ---------- */
+  http.get(u('/locations'), ({ request }) => {
+    const sp = new URL(request.url).searchParams;
+    const level = sp.get('level');
+    const parent = sp.get('parent');
+    const search = sp.get('search')?.toLowerCase();
+    let list = mockLocations;
+    if (level) list = list.filter((l) => l.level === level);
+    if (parent) list = list.filter((l) => l.parent === parent);
+    if (search) list = list.filter((l) => l.name.toLowerCase().includes(search));
+    return HttpResponse.json(list);
+  }),
+
   /* ---------- sensor nodes ---------- */
   http.get(u('/sensor-nodes'), ({ request }) => {
     const field = new URL(request.url).searchParams.get('field');
-    const list = field ? mockNodes.filter((n) => n.field === field) : mockNodes;
+    const list = field ? nodes.filter((n) => n.field === field) : nodes;
     return HttpResponse.json(page(list));
+  }),
+  http.post(u('/sensor-nodes'), async ({ request }) => {
+    const body = (await request.json()) as {
+      field: string;
+      device_id: string;
+      status?: SensorNode['status'];
+      battery?: number;
+    };
+    const fieldObj = fields.find((f) => f.id === body.field);
+    const node: SensorNode = {
+      id: uid(),
+      field: body.field,
+      field_name: fieldObj?.name,
+      device_id: body.device_id,
+      status: body.status ?? 'active',
+      battery: body.battery ?? 100,
+      last_seen: new Date().toISOString(),
+    };
+    nodes.unshift(node);
+    return HttpResponse.json(node, { status: 201 });
+  }),
+  http.patch(u('/sensor-nodes/:id'), async ({ params, request }) => {
+    const patch = (await request.json()) as Partial<SensorNode>;
+    const idx = nodes.findIndex((n) => n.id === params.id);
+    if (idx === -1) return new HttpResponse(null, { status: 404 });
+    nodes[idx] = { ...nodes[idx]!, ...patch };
+    return HttpResponse.json(nodes[idx]);
+  }),
+  http.delete(u('/sensor-nodes/:id'), ({ params }) => {
+    const idx = nodes.findIndex((n) => n.id === params.id);
+    if (idx !== -1) nodes.splice(idx, 1);
+    return new HttpResponse(null, { status: 204 });
   }),
 
   /* ---------- sensor readings ---------- */
@@ -160,14 +239,24 @@ export const handlers = [
     if (type) list = list.filter((r) => r.type === type);
     return HttpResponse.json(page(list));
   }),
-  ...(['irrigation', 'fertilizer', 'yield'] as const).map((type) =>
-    http.post(u(`/recommendations/${type}`), async ({ request }) => {
-      const { field } = (await request.json()) as { field: string };
-      const fieldObj = fields.find((f) => f.id === field);
-      const rec: Recommendation = {
-        id: uid(),
-        field,
-        field_name: fieldObj?.name,
+  // Auto-generated latest advice bundle for a field: one item per type.
+  http.get(u('/recommendations/latest'), ({ request }) => {
+    const field = new URL(request.url).searchParams.get('field') ?? 'fld1';
+    const types = ['irrigation', 'fertilizer', 'yield'] as const;
+    const items = types.map((type) => {
+      // Prefer any existing history entry for this field/type, else synthesize.
+      const existing = recommendations.find((r) => r.field === field && r.type === type);
+      if (existing) {
+        return {
+          type,
+          decision: existing.decision,
+          value: existing.value,
+          unit: existing.unit,
+          confidence: existing.confidence,
+          details: existing.details,
+        };
+      }
+      return {
         type,
         decision:
           type === 'irrigation'
@@ -179,13 +268,11 @@ export const handlers = [
         unit: type === 'irrigation' ? 'mm' : type === 'fertilizer' ? 'kg/ha' : 't/ha',
         confidence: 0.7 + Math.random() * 0.25,
         details:
-          'Generated from the latest sensor readings, crop growth stage, and 48-hour weather outlook for this field.',
-        created_at: new Date().toISOString(),
+          'Generated from the latest sensor readings, crop growth stage, and 48-hour weather outlook for this section.',
       };
-      recommendations.unshift(rec);
-      return HttpResponse.json(rec, { status: 201 });
-    }),
-  ),
+    });
+    return HttpResponse.json({ field, generated_at: new Date().toISOString(), items });
+  }),
 
   /* ---------- diseases ---------- */
   http.post(u('/diseases/detect'), async ({ request }) => {

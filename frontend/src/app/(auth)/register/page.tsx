@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useLocale, useTranslations } from 'next-intl';
@@ -7,41 +8,34 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { LocationPicker } from '@/components/LocationPicker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useRegister } from '@/hooks/useAuth';
-import { registerInput, roleSchema, type RegisterInput, type Role } from '@/lib/schemas';
-
-const roles = roleSchema.options;
+import { registerInput, type RegisterInput } from '@/lib/schemas';
 
 export default function RegisterPage() {
   const t = useTranslations('auth');
+  const tc = useTranslations('common');
+  const tl = useTranslations('location');
   const locale = useLocale() as 'rw' | 'en';
   const router = useRouter();
   const signup = useRegister();
+  const [location, setLocation] = useState<string | undefined>(undefined);
   const {
     register,
     handleSubmit,
-    setValue,
-    watch,
     formState: { errors },
   } = useForm<RegisterInput>({
     resolver: zodResolver(registerInput),
-    defaultValues: { role: 'farmer', language: locale },
+    defaultValues: { language: locale },
   });
 
-  const role = watch('role');
-
   const onSubmit = (values: RegisterInput) => {
-    signup.mutate(values, {
+    signup.mutate(
+      { ...values, location },
+      {
       onSuccess: (data) => {
         const params = new URLSearchParams({
           identifier: data.identifier ?? values.phone_number ?? values.email,
@@ -83,20 +77,12 @@ export default function RegisterPage() {
           <Input id="password" type="password" autoComplete="new-password" {...register('password')} />
           {errors.password && <p className="text-xs text-ink-700">{errors.password.message}</p>}
         </div>
+
         <div className="space-y-1.5">
-          <Label>{t('role')}</Label>
-          <Select value={role} onValueChange={(v) => setValue('role', v as Role)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {roles.map((r) => (
-                <SelectItem key={r} value={r}>
-                  {t(`roles.${r}`)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label>
+            {tl('label')} <span className="text-ink-500">({tc('optional')})</span>
+          </Label>
+          <LocationPicker value={location} onChange={setLocation} />
         </div>
 
         <Button type="submit" size="lg" className="w-full" disabled={signup.isPending}>

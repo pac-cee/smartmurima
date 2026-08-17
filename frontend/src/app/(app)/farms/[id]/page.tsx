@@ -5,9 +5,21 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
-import { ArrowLeft, BatteryCharging, Layers, Loader2, MapPin, Plus, Radio } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import {
+  ArrowLeft,
+  BatteryCharging,
+  Layers,
+  Loader2,
+  MapPin,
+  Pencil,
+  Plus,
+  Radio,
+  Trash2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { EmptyState } from '@/components/EmptyState';
+import { LocationPicker } from '@/components/LocationPicker';
 import { ListSkeleton } from '@/components/Skeletons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,6 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -29,9 +42,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useFarm } from '@/hooks/useFarms';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useDeleteFarm, useFarm, useUpdateFarm } from '@/hooks/useFarms';
 import { useCreateField, useCrops, useFields, useNodes } from '@/hooks/useFields';
-import { fieldInput, growthStageSchema, type FieldInput } from '@/lib/schemas';
+import { farmInput, fieldInput, growthStageSchema, type Farm, type FarmInput, type FieldInput } from '@/lib/schemas';
 import { relativeTime } from '@/lib/utils';
 
 function CreateFieldDialog({ farmId }: { farmId: string }) {
@@ -62,7 +76,7 @@ function CreateFieldDialog({ farmId }: { farmId: string }) {
   const onSubmit = (values: FieldInput) => {
     create.mutate(values, {
       onSuccess: () => {
-        toast.success('Field added');
+        toast.success(t('added'));
         setOpen(false);
         reset({ farm: farmId, growth_stage: 'germination' });
       },
@@ -87,10 +101,12 @@ function CreateFieldDialog({ farmId }: { farmId: string }) {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>{t('crop')}</Label>
-              <Select value={crop} onValueChange={(v) => setValue('crop', v)}>
+              <Label>
+                {t('crop')} <span className="text-green-700">*</span>
+              </Label>
+              <Select value={crop || undefined} onValueChange={(v) => setValue('crop', v)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="—" />
+                  <SelectValue placeholder={t('selectCrop')} />
                 </SelectTrigger>
                 <SelectContent>
                   {crops?.map((c) => (
@@ -150,12 +166,178 @@ function CreateFieldDialog({ farmId }: { farmId: string }) {
   );
 }
 
+function EditFarmDialog({ farm }: { farm: Farm }) {
+  const t = useTranslations('farms');
+  const tc = useTranslations('common');
+  const [open, setOpen] = useState(false);
+  const [location, setLocation] = useState<string | undefined>(farm.location ?? undefined);
+  const update = useUpdateFarm();
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<FarmInput>({
+    resolver: zodResolver(farmInput),
+    defaultValues: {
+      name: farm.name,
+      sector: farm.sector,
+      area_hectares: farm.area_hectares,
+      latitude: farm.latitude,
+      longitude: farm.longitude,
+    },
+  });
+
+  const onSubmit = (values: FarmInput) => {
+    update.mutate(
+      { id: farm.id, input: { ...values, location } },
+      {
+        onSuccess: () => {
+          toast.success(tc('saved'));
+          setOpen(false);
+        },
+      },
+    );
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) {
+          reset({
+            name: farm.name,
+            sector: farm.sector,
+            area_hectares: farm.area_hectares,
+            latitude: farm.latitude,
+            longitude: farm.longitude,
+          });
+          setLocation(farm.location ?? undefined);
+        }
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Pencil className="size-4" /> {tc('edit')}
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t('editFarm')}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="edit_name">{t('name')}</Label>
+            <Input id="edit_name" {...register('name')} />
+            {errors.name && <p className="text-xs text-ink-700">{errors.name.message}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="edit_sector">{t('sector')}</Label>
+            <Input id="edit_sector" {...register('sector')} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>{t('location')}</Label>
+            <LocationPicker
+              value={location}
+              onChange={setLocation}
+              currentLabel={farm.location_name}
+            />
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit_area">{t('area')}</Label>
+              <Input
+                id="edit_area"
+                type="number"
+                step="0.1"
+                {...register('area_hectares', { valueAsNumber: true })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit_lat">{t('latitude')}</Label>
+              <Input
+                id="edit_lat"
+                type="number"
+                step="0.0001"
+                {...register('latitude', { valueAsNumber: true })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit_lng">{t('longitude')}</Label>
+              <Input
+                id="edit_lng"
+                type="number"
+                step="0.0001"
+                {...register('longitude', { valueAsNumber: true })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+              {tc('cancel')}
+            </Button>
+            <Button type="submit" disabled={update.isPending}>
+              {update.isPending && <Loader2 className="size-4 animate-spin" />}
+              {tc('save')}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DeleteFarmDialog({ farm }: { farm: Farm }) {
+  const t = useTranslations('farms');
+  const tc = useTranslations('common');
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const remove = useDeleteFarm();
+
+  const onConfirm = () => {
+    remove.mutate(farm.id, {
+      onSuccess: () => {
+        toast.success(t('deleted'));
+        setOpen(false);
+        router.push('/farms');
+      },
+      onError: () => toast.error(tc('retry')),
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="text-ink-700">
+          <Trash2 className="size-4" /> {tc('delete')}
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t('deleteFarm')}</DialogTitle>
+          <DialogDescription>{t('deleteConfirm', { name: farm.name })}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+            {tc('cancel')}
+          </Button>
+          <Button type="button" variant="danger" onClick={onConfirm} disabled={remove.isPending}>
+            {remove.isPending && <Loader2 className="size-4 animate-spin" />}
+            {tc('delete')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function FarmDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const t = useTranslations('farms');
   const tf = useTranslations('fields');
   const ts = useTranslations('sensors');
-  const { data: farm } = useFarm(id);
+  const { data: farm, isLoading: farmLoading } = useFarm(id);
   const { data: fields, isLoading: fieldsLoading } = useFields(id);
   const { data: nodes } = useNodes();
 
@@ -171,23 +353,38 @@ export default function FarmDetailPage({ params }: { params: Promise<{ id: strin
       </Link>
 
       <div className="flex flex-col gap-4 rounded-card border border-line bg-card p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-ink-900">{farm?.name ?? '—'}</h1>
-          <p className="mt-1 flex items-center gap-1 text-sm text-ink-500">
-            <MapPin className="size-4" /> {farm?.sector} · {farm?.latitude?.toFixed(3)},{' '}
-            {farm?.longitude?.toFixed(3)}
-          </p>
-        </div>
-        <div className="flex gap-6">
-          <div>
-            <p className="tabular text-2xl font-bold text-green-700">{farm?.area_hectares ?? 0}</p>
-            <p className="text-xs text-ink-500">{t('area')}</p>
+        {farmLoading || !farm ? (
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-64" />
           </div>
-          <div>
-            <p className="tabular text-2xl font-bold text-green-700">{fields?.length ?? 0}</p>
-            <p className="text-xs text-ink-500">{t('fields')}</p>
-          </div>
-        </div>
+        ) : (
+          <>
+            <div>
+              <h1 className="text-2xl font-bold text-ink-900">{farm.name}</h1>
+              <p className="mt-1 flex items-center gap-1 text-sm text-ink-500">
+                <MapPin className="size-4" /> {farm.location_name ?? farm.sector} ·{' '}
+                {farm.latitude.toFixed(3)}, {farm.longitude.toFixed(3)}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex gap-6">
+                <div>
+                  <p className="tabular text-2xl font-bold text-green-700">{farm.area_hectares}</p>
+                  <p className="text-xs text-ink-500">{t('area')}</p>
+                </div>
+                <div>
+                  <p className="tabular text-2xl font-bold text-green-700">{fields?.length ?? 0}</p>
+                  <p className="text-xs text-ink-500">{t('fields')}</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <EditFarmDialog farm={farm} />
+                <DeleteFarmDialog farm={farm} />
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* location strip (map placeholder, no external tiles) */}

@@ -6,12 +6,13 @@ import { MessageCircle, Plus } from 'lucide-react';
 import { AssistantChat } from '@/components/AssistantChat';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useSessions } from '@/hooks/useAssistant';
 import { cn, relativeTime } from '@/lib/utils';
 
 export default function AssistantPage() {
   const t = useTranslations('assistant');
-  const { data: sessions } = useSessions();
+  const { data: sessions, isLoading: sessionsLoading } = useSessions();
   const [activeSession, setActiveSession] = useState<string | undefined>(undefined);
   const [chatKey, setChatKey] = useState(0);
 
@@ -28,6 +29,16 @@ export default function AssistantPage() {
           <Plus className="size-4" /> {t('newChat')}
         </Button>
         <div className="mt-4 space-y-1 overflow-y-auto">
+          {sessionsLoading &&
+            [0, 1, 2, 3].map((i) => (
+              <div key={i} className="flex items-start gap-2 px-3 py-2.5">
+                <Skeleton className="mt-0.5 size-4 shrink-0 rounded-tile" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/3" />
+                </div>
+              </div>
+            ))}
           {sessions?.map((s) => (
             <button
               key={s.id}

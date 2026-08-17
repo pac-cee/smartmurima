@@ -20,6 +20,7 @@ def healthcheck(_request):
 
 api_v1 = [
     path("auth/", include("apps.accounts.urls")),
+    path("", include("apps.locations.urls")),
     path("", include("apps.farms.urls")),
     path("", include("apps.sensors.urls")),
     path("", include("apps.recommendations.urls")),

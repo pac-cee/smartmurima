@@ -1,5 +1,6 @@
 from django.http import HttpResponse
 from drf_spectacular.utils import OpenApiParameter, extend_schema
+from rest_framework.negotiation import BaseContentNegotiation
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -11,6 +12,22 @@ from .services import ReportService
 
 def _dt(value):
     return parse_datetime(value) if value else None
+
+
+class IgnoreFormatNegotiation(BaseContentNegotiation):
+    """Content negotiation that ignores the ``format`` query parameter.
+
+    The export endpoint uses ``?format=csv|pdf`` as a *business* parameter, but
+    DRF's default negotiation treats ``format`` as a renderer selector and
+    raises 404 when no renderer named "csv"/"pdf" exists. This negotiator just
+    returns the first configured renderer (the view writes a raw HttpResponse,
+    so the renderer is never actually used for the file body)."""
+
+    def select_parser(self, request, parsers):
+        return parsers[0] if parsers else None
+
+    def select_renderer(self, request, renderers, format_suffix=None):
+        return (renderers[0], renderers[0].media_type)
 
 
 class ReportSummaryView(APIView):
@@ -36,6 +53,7 @@ class ReportSummaryView(APIView):
 
 class ReportExportView(APIView):
     permission_classes = [IsAuthenticated]
+    content_negotiation_class = IgnoreFormatNegotiation
 
     @extend_schema(
         parameters=[

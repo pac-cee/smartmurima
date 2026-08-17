@@ -1,8 +1,12 @@
 """Seed demo data so the whole system demos end-to-end.
 
-Creates one active user per role, a couple of farms/fields, sensor nodes, and a
-week of synthetic sensor readings (some below the low-moisture threshold to
-trigger alerts). Idempotent: safe to run repeatedly.
+Creates a set of crops, one active demo farmer with a Farmer profile, a farm,
+three fields, and exactly two sensor nodes (``SM-NODE-01`` / ``SM-NODE-02`` --
+the fixed device-id contract an external simulator publishes to), plus ~48h of
+historical readings per node and a sample alert.
+
+Idempotent: safe to run repeatedly. Readings are generated only when a node has
+none yet, so re-running never duplicates telemetry.
 """
 import random
 from datetime import timedelta
@@ -11,53 +15,68 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
+from apps.accounts.models import Farmer
+from apps.alerts.models import Alert, AlertType, Severity
 from apps.farms.models import Crop, Farm, Field, SensorNode
-from apps.sensors.services import IngestionService
+from apps.sensors.models import SensorReading
 
 User = get_user_model()
 
-DEMO_PASSWORD = "Demo1234!"
+FARMER_EMAIL = "farmer@smartmurima.rw"
+FARMER_PHONE = "+250780000001"
+FARMER_PASSWORD = "farmer12345"
 
-DEMO_USERS = [
-    ("farmer_demo", "farmer@smartmurima.rw", "+250780000001", "farmer", "Jean Uwimana"),
-    ("coop_demo", "coop@smartmurima.rw", "+250780000002", "coop_admin", "Marie Coop"),
-    ("extension_demo", "ext@smartmurima.rw", "+250780000003", "extension", "Eric Ext"),
-    ("admin_demo", "admin@smartmurima.rw", "+250780000004", "admin", "Admin User"),
+CROPS = [
+    ("Maize", 10.0, "Season A"),
+    ("Beans", 8.0, "Season B"),
+    ("Irish Potato", 7.0, "Season A"),
+    ("Cassava", 12.0, "Season B"),
 ]
+
+# Fixed device-id contract: an external simulator publishes to these ids.
+NODE_A_DEVICE_ID = "SM-NODE-01"
+NODE_B_DEVICE_ID = "SM-NODE-02"
 
 
 class Command(BaseCommand):
-    help = "Seed demo users, farms, fields, sensor nodes, and readings."
+    help = "Seed demo crops, a farmer, a farm, fields, sensor nodes, and readings."
 
     def handle(self, *args, **options):
-        users = {}
-        for username, email, phone, role, full_name in DEMO_USERS:
-            user, created = User.objects.get_or_create(
-                username=username,
-                defaults={
-                    "email": email,
-                    "phone_number": phone,
-                    "role": role,
-                    "full_name": full_name,
-                    "is_active": True,
-                    "is_staff": role == "admin",
-                    "is_superuser": role == "admin",
-                },
+        # -- crops --------------------------------------------------------
+        crops = {}
+        for name, base_temp, season in CROPS:
+            crop, _ = Crop.objects.get_or_create(
+                name=name, defaults={"base_temp": base_temp, "season": season}
             )
-            if created:
-                user.set_password(DEMO_PASSWORD)
-                user.save()
-            users[role] = user
-        self.stdout.write(self.style.SUCCESS(f"Users ready ({len(users)} roles)."))
+            crops[name] = crop
+        self.stdout.write(self.style.SUCCESS(f"Crops ready ({len(crops)})."))
 
-        maize, _ = Crop.objects.get_or_create(
-            name="Maize", defaults={"base_temp": 10.0, "season": "Season A"}
+        # -- demo farmer --------------------------------------------------
+        farmer, created = User.objects.get_or_create(
+            username="farmer_demo",
+            defaults={
+                "email": FARMER_EMAIL,
+                "phone_number": FARMER_PHONE,
+                "role": "farmer",
+                "full_name": "Jean Uwimana",
+                "is_active": True,
+                "is_staff": False,
+                "is_superuser": False,
+            },
         )
-        beans, _ = Crop.objects.get_or_create(
-            name="Beans", defaults={"base_temp": 8.0, "season": "Season B"}
+        # Always guarantee the documented dev password + active state, even when
+        # the account already exists from an earlier seed.
+        farmer.set_password(FARMER_PASSWORD)
+        farmer.is_active = True
+        if not farmer.email:
+            farmer.email = FARMER_EMAIL
+        farmer.save()
+        Farmer.objects.get_or_create(
+            user=farmer, defaults={"cooperative_name": "Bugesera Coop"}
         )
+        self.stdout.write(self.style.SUCCESS(f"Demo farmer ready ({FARMER_EMAIL})."))
 
-        farmer = users["farmer"]
+        # -- farm ---------------------------------------------------------
         farm, _ = Farm.objects.get_or_create(
             farmer=farmer,
             name="Bugesera Demo Farm",
@@ -69,11 +88,12 @@ class Command(BaseCommand):
             },
         )
 
+        # -- fields -------------------------------------------------------
         field_a, _ = Field.objects.get_or_create(
             farm=farm,
             name="North Plot",
             defaults={
-                "crop": maize,
+                "crop": crops["Maize"],
                 "planting_date": timezone.now().date() - timedelta(days=40),
                 "growth_stage": "vegetative",
                 "area_hectares": 1.0,
@@ -83,75 +103,84 @@ class Command(BaseCommand):
             farm=farm,
             name="South Plot",
             defaults={
-                "crop": beans,
+                "crop": crops["Beans"],
                 "planting_date": timezone.now().date() - timedelta(days=20),
                 "growth_stage": "flowering",
                 "area_hectares": 1.5,
             },
         )
-        field_c, _ = Field.objects.get_or_create(
+        Field.objects.get_or_create(
             farm=farm,
             name="East Plot",
             defaults={
-                "crop": maize,
+                "crop": crops["Irish Potato"],
                 "planting_date": timezone.now().date() - timedelta(days=30),
                 "growth_stage": "vegetative",
                 "area_hectares": 1.2,
             },
         )
 
-        # Device IDs match the IoT simulator (iot/simulator/simulate_nodes.py)
-        # and firmware, so live telemetry lands on these demo fields out of the
-        # box: smartmurima/<device_id>/telemetry -> ingestion -> field.
+        # -- sensor nodes (fixed device-id contract) ----------------------
         node_a, _ = SensorNode.objects.get_or_create(
-            device_id="node-bugesera-01",
+            device_id=NODE_A_DEVICE_ID,
             defaults={"field": field_a, "status": "active", "battery": 92},
         )
         node_b, _ = SensorNode.objects.get_or_create(
-            device_id="node-bugesera-02",
+            device_id=NODE_B_DEVICE_ID,
             defaults={"field": field_b, "status": "active", "battery": 78},
         )
-        node_c, _ = SensorNode.objects.get_or_create(
-            device_id="node-bugesera-03",
-            defaults={"field": field_c, "status": "active", "battery": 85},
-        )
 
-        # Generate a week of readings through the IngestionService so that the
-        # alert rule fires exactly as it would in production.
-        ingestion = IngestionService()
+        # -- ~48h of historical readings per node -------------------------
         rng = random.Random(42)
         now = timezone.now()
         made = 0
-        node_base = {node_a.id: 22, node_b.id: 30, node_c.id: 26}
-        for node in (node_a, node_b, node_c):
-            for h in range(0, 7 * 24, 6):  # every 6h for 7 days
-                ts = now - timedelta(hours=(7 * 24 - h))
-                # Occasionally dip below the low-moisture threshold (20%).
-                base = node_base[node.id]
-                soil = max(5.0, base + rng.uniform(-10, 8))
-                payload = {
-                    "device_id": node.device_id,
-                    "soil_moisture": round(soil, 1),
-                    "temperature": round(20 + rng.uniform(-3, 8), 1),
-                    "humidity": round(60 + rng.uniform(-10, 15), 1),
-                    "rainfall": round(max(0.0, rng.uniform(-2, 4)), 1),
-                    "timestamp": ts.isoformat(),
-                    "battery": node.battery,
-                }
-                try:
-                    if ingestion.ingest(payload) is not None:
-                        made += 1
-                except Exception as exc:  # pragma: no cover
-                    self.stderr.write(f"reading skipped: {exc}")
+        node_base = {node_a.id: 24, node_b.id: 30}
+        for node in (node_a, node_b):
+            if SensorReading.objects.filter(sensor_node=node).exists():
+                continue  # idempotent: don't duplicate telemetry
+            base = node_base[node.id]
+            rows = []
+            # 48 hours at 30-minute intervals.
+            for i in range(96):
+                ts = now - timedelta(minutes=30 * i)
+                soil = max(5.0, min(100.0, base + rng.uniform(-10, 8)))
+                rows.append(
+                    SensorReading(
+                        sensor_node=node,
+                        soil_moisture=round(soil, 1),
+                        temperature=round(20 + rng.uniform(-3, 8), 1),
+                        humidity=round(60 + rng.uniform(-10, 15), 1),
+                        rainfall=round(max(0.0, rng.uniform(-2, 4)), 1),
+                        recorded_at=ts,
+                    )
+                )
+            SensorReading.objects.bulk_create(rows, ignore_conflicts=True)
+            node.last_seen = now
+            node.save(update_fields=["last_seen"])
+            made += len(rows)
+
+        # -- sample alert -------------------------------------------------
+        Alert.objects.get_or_create(
+            user=farmer,
+            type=AlertType.LOW_MOISTURE,
+            message=(
+                f"Low soil moisture detected in field '{field_a.name}'. "
+                "Consider irrigating."
+            ),
+            defaults={
+                "severity": Severity.WARNING,
+                "context": {"field_id": field_a.id, "soil_moisture": 18.0},
+            },
+        )
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Seeded farm '{farm.name}', 3 fields, 3 nodes "
-                f"(node-bugesera-01/02/03), {made} readings."
+                f"Seeded farm '{farm.name}', 3 fields, 2 nodes "
+                f"({NODE_A_DEVICE_ID}/{NODE_B_DEVICE_ID}), {made} readings, 1 alert."
             )
         )
         self.stdout.write(
             self.style.NOTICE(
-                f"Demo login password for all demo users: {DEMO_PASSWORD}"
+                f"Demo farmer login: {FARMER_EMAIL} / {FARMER_PASSWORD}"
             )
         )

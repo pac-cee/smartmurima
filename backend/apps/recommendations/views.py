@@ -30,6 +30,20 @@ class RecommendationViewSet(ListModelMixin, GenericViewSet):
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
+    @extend_schema(parameters=[OpenApiParameter("field", int, required=True)])
+    @action(detail=False, methods=["get"])
+    def latest(self, request):
+        """Current advice bundle for a field, auto-generating/refreshing as
+        needed. No manual trigger required from the client."""
+        field_id = request.query_params.get("field")
+        if not field_id:
+            return Response(
+                {"detail": "Query param 'field' is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        bundle = RecommendationService().latest(request.user, field_id)
+        return Response(bundle)
+
     def _run(self, request, method_name):
         serializer = RunRecommendationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
