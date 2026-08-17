@@ -17,9 +17,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-# Admin theme, in its own layer so the heavy requirements layer above stays
-# cached (avoids re-downloading numpy/xgboost wheels on a rebuild).
-RUN pip install --no-cache-dir django-jazzmin==3.0.1
+# Admin theme + WhiteNoise (serves collected static under gunicorn, so admin
+# CSS/JS load with DEBUG off). Own layer to keep the heavy requirements layer
+# above cached (avoids re-downloading numpy/xgboost wheels on a rebuild).
+RUN pip install --no-cache-dir django-jazzmin==3.0.1 whitenoise==6.7.0
 
 COPY . .
 
