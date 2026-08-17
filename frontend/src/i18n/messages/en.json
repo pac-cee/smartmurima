@@ -24,7 +24,13 @@
   "sections": {
     "section": "Section",
     "sections": "Sections",
-    "noSection": "Select or add a section to continue."
+    "noSection": "Select or add a section to continue.",
+    "selectPrompt": "Select a section from the top bar",
+    "selectPromptBody": "Use the Farm / Section switcher at the top of the page to choose a section to view here."
+  },
+  "switcher": {
+    "farm": "Farm",
+    "section": "Section"
   },
   "location": {
     "label": "Location",

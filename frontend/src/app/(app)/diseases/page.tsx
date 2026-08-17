@@ -1,31 +1,21 @@
 'use client';
 
-import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Stethoscope } from 'lucide-react';
+import { MapPinned, Stethoscope } from 'lucide-react';
 import { DiseaseUploadCard } from '@/components/DiseaseUploadCard';
 import { EmptyState } from '@/components/EmptyState';
 import { PageHeader } from '@/components/PageHeader';
 import { useSelection } from '@/components/selection-context';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useDiseaseReports } from '@/hooks/useDiseaseDetect';
-import { useFields } from '@/hooks/useFields';
 import { relativeTime } from '@/lib/utils';
 
 export default function DiseasesPage() {
   const t = useTranslations('diseases');
-  const { farmId, fieldId } = useSelection();
-  const { data: fields } = useFields(farmId ?? undefined);
-  const [selectedField, setSelectedField] = useState<string | undefined>(fieldId ?? undefined);
-  const effectiveField = selectedField ?? fieldId ?? fields?.[0]?.id;
+  const ts = useTranslations('sections');
+  // Section to scan against comes from the global top-bar switcher.
+  const { fieldId } = useSelection();
   const { data: reports } = useDiseaseReports();
 
   return (
@@ -34,24 +24,15 @@ export default function DiseasesPage() {
 
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="space-y-4 lg:col-span-3">
-          <div className="max-w-xs">
-            <label className="mb-1.5 block text-sm font-medium text-ink-700">
-              {t('selectField')}
-            </label>
-            <Select value={effectiveField} onValueChange={setSelectedField}>
-              <SelectTrigger>
-                <SelectValue placeholder={t('selectField')} />
-              </SelectTrigger>
-              <SelectContent>
-                {fields?.map((f) => (
-                  <SelectItem key={f.id} value={f.id}>
-                    {f.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <DiseaseUploadCard fieldId={effectiveField} />
+          {!fieldId ? (
+            <EmptyState
+              icon={MapPinned}
+              title={ts('selectPrompt')}
+              description={ts('selectPromptBody')}
+            />
+          ) : (
+            <DiseaseUploadCard fieldId={fieldId} />
+          )}
         </div>
 
         <Card className="lg:col-span-2">

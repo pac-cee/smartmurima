@@ -47,6 +47,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useSelection } from '@/components/selection-context';
+// NOTE: the Select imports above are used ONLY inside the Add/Edit node dialogs
+// (device status). The farm/section selection comes from the global top-bar
+// switcher via useSelection() — this page renders no farm/section picker.
 import { useFarms } from '@/hooks/useFarms';
 import {
   useCreateNode,
@@ -256,14 +259,15 @@ export default function SensorsPage() {
   const t = useTranslations('sensors');
   const ts = useTranslations('sections');
   const tnav = useTranslations('nav');
-  const { farmId, fieldId, setField } = useSelection();
+  const { farmId, fieldId } = useSelection();
 
   const { data: farms, isLoading: farmsLoading } = useFarms();
   const activeFarm = farmId ?? farms?.[0]?.id;
   const farm = farms?.find((f) => f.id === activeFarm);
 
   const { data: fields, isLoading: fieldsLoading } = useFields(activeFarm ?? undefined);
-  const activeField = fieldId ?? fields?.[0]?.id;
+  // Section comes from the GLOBAL top-bar switcher — never auto-picked here.
+  const activeField = fieldId ?? undefined;
   const section = fields?.find((f) => f.id === activeField);
 
   const { data: latest, isLoading: latestLoading } = useLatestReading(activeField ?? undefined);
@@ -290,29 +294,14 @@ export default function SensorsPage() {
     <div className="space-y-6">
       <Header t={t} lastSeen={latest?.recorded_at ?? null} />
 
-      {/* Section selector */}
-      <div className="flex items-center gap-3">
-        <span className="text-sm text-ink-500">{ts('section')}</span>
-        <Select
-          value={activeField ?? undefined}
-          onValueChange={(v) => setField(v)}
-          disabled={fieldsLoading || !fields?.length}
-        >
-          <SelectTrigger className="w-64">
-            <SelectValue placeholder="—" />
-          </SelectTrigger>
-          <SelectContent>
-            {fields?.map((f) => (
-              <SelectItem key={f.id} value={f.id}>
-                {f.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
       {!fieldsLoading && (!fields || fields.length === 0) ? (
         <EmptyState icon={MapPinned} title={ts('noSection')} />
+      ) : !activeField ? (
+        <EmptyState
+          icon={MapPinned}
+          title={ts('selectPrompt')}
+          description={ts('selectPromptBody')}
+        />
       ) : (
         <>
           {/* KPI row */}

@@ -14,6 +14,10 @@ import { useSelection } from '@/components/selection-context';
 import { useFarms } from '@/hooks/useFarms';
 import { useFields } from '@/hooks/useFields';
 
+// This is the SINGLE source of truth for the active Farm + Section across the
+// whole app. Every page reads it through `useSelection()` and must NOT render
+// its own farm/section picker. Note: "Section" == the field/plot record; the
+// app relabels Field -> Section in all user-facing copy.
 export function FarmFieldSwitcher() {
   const t = useTranslations();
   const { farmId, fieldId, setFarm, setField } = useSelection();
@@ -37,38 +41,48 @@ export function FarmFieldSwitcher() {
   }, [fields, fieldId]);
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1.5 sm:gap-2">
       <MapPin className="hidden size-4 text-green-600 sm:block" />
-      <Select value={farmId ?? undefined} onValueChange={(v) => setFarm(v)}>
-        <SelectTrigger className="h-9 w-[130px] border-0 bg-transparent px-2 shadow-none focus:ring-0 sm:w-[170px]">
-          <SelectValue placeholder={t('farms.title')} />
-        </SelectTrigger>
-        <SelectContent>
-          {farms?.map((farm) => (
-            <SelectItem key={farm.id} value={farm.id}>
-              {farm.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <div className="flex items-center gap-1.5">
+        <span className="hidden text-xs font-medium uppercase tracking-wide text-ink-500 sm:block">
+          {t('switcher.farm')}
+        </span>
+        <Select value={farmId ?? undefined} onValueChange={(v) => setFarm(v)}>
+          <SelectTrigger className="h-9 w-[120px] border-0 bg-transparent px-2 shadow-none focus:ring-0 sm:w-[160px]">
+            <SelectValue placeholder={t('switcher.farm')} />
+          </SelectTrigger>
+          <SelectContent>
+            {farms?.map((farm) => (
+              <SelectItem key={farm.id} value={farm.id}>
+                {farm.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
       <span className="text-line">/</span>
-      <Select
-        value={fieldId ?? 'all'}
-        onValueChange={(v) => setField(v === 'all' ? null : v)}
-        disabled={!fields || fields.length === 0}
-      >
-        <SelectTrigger className="h-9 w-[130px] border-0 bg-transparent px-2 shadow-none focus:ring-0 sm:w-[170px]">
-          <SelectValue placeholder={t('fields.title')} />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">{t('common.all')}</SelectItem>
-          {fields?.map((field) => (
-            <SelectItem key={field.id} value={field.id}>
-              {field.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <div className="flex items-center gap-1.5">
+        <span className="hidden text-xs font-medium uppercase tracking-wide text-ink-500 sm:block">
+          {t('switcher.section')}
+        </span>
+        <Select
+          value={fieldId ?? 'all'}
+          onValueChange={(v) => setField(v === 'all' ? null : v)}
+          disabled={!fields || fields.length === 0}
+        >
+          <SelectTrigger className="h-9 w-[120px] border-0 bg-transparent px-2 shadow-none focus:ring-0 sm:w-[160px]">
+            <SelectValue placeholder={t('switcher.section')} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t('common.all')}</SelectItem>
+            {fields?.map((field) => (
+              <SelectItem key={field.id} value={field.id}>
+                {field.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   );
 }

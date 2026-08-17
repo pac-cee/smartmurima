@@ -24,7 +24,13 @@
   "sections": {
     "section": "Igice",
     "sections": "Ibice",
-    "noSection": "Hitamo cyangwa wongereho igice kugira ngo ukomeze."
+    "noSection": "Hitamo cyangwa wongereho igice kugira ngo ukomeze.",
+    "selectPrompt": "Hitamo igice mu kagaragazo ko hejuru",
+    "selectPromptBody": "Koresha agahitamo k'Umurima / Igice kaguru ku ipaji kugira ngo uhitemo igice cyo kureba hano."
+  },
+  "switcher": {
+    "farm": "Umurima",
+    "section": "Igice"
   },
   "location": {
     "label": "Aho iherereye",
