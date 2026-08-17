@@ -20,11 +20,21 @@ export function FarmFieldSwitcher() {
   const { data: farms } = useFarms();
   const { data: fields } = useFields(farmId ?? undefined);
 
-  // default to first farm once loaded
+  // Default to the first farm once loaded, and SELF-HEAL a stale/invalid
+  // selection (e.g. a leftover mock id like "f1" in localStorage from an
+  // earlier mock-mode session) that would otherwise 500 the field/report APIs.
   useEffect(() => {
-    if (!farmId && farms && farms.length > 0) setFarm(farms[0]!.id);
+    if (!farms || farms.length === 0) return;
+    const valid = new Set(farms.map((f) => f.id));
+    if (!farmId || !valid.has(farmId)) setFarm(farms[0]!.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [farms]);
+  }, [farms, farmId]);
+
+  // Drop a stale field selection that isn't part of the current farm.
+  useEffect(() => {
+    if (fields && fieldId && !fields.some((f) => f.id === fieldId)) setField(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fields, fieldId]);
 
   return (
     <div className="flex items-center gap-2">

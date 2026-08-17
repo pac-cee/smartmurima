@@ -14,6 +14,12 @@ def _dt(value):
     return parse_datetime(value) if value else None
 
 
+def _int(value):
+    """Safely coerce an id query param; None for missing/non-numeric (e.g. a
+    stale mock 'f1'), so a bad id never 500s the endpoint."""
+    return int(value) if value and str(value).isdigit() else None
+
+
 class IgnoreFormatNegotiation(BaseContentNegotiation):
     """Content negotiation that ignores the ``format`` query parameter.
 
@@ -44,7 +50,7 @@ class ReportSummaryView(APIView):
         p = request.query_params
         data = ReportService().summary(
             request.user,
-            farm_id=p.get("farm"),
+            farm_id=_int(p.get("farm")),
             date_from=_dt(p.get("from")),
             date_to=_dt(p.get("to")),
         )
@@ -67,7 +73,7 @@ class ReportExportView(APIView):
         p = request.query_params
         fmt = (p.get("format") or "csv").lower()
         service = ReportService()
-        farm_id = p.get("farm")
+        farm_id = _int(p.get("farm"))
         date_from = _dt(p.get("from"))
         date_to = _dt(p.get("to"))
         if fmt == "pdf":
