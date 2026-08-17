@@ -166,11 +166,8 @@ export type Farm = z.infer<typeof farmSchema>;
 
 export const farmInput = z.object({
   name: z.string().min(2),
-  sector: z.string().min(2),
-  latitude: z.number().min(-90).max(90),
-  longitude: z.number().min(-180).max(180),
   area_hectares: z.number().positive(),
-  // Optional sector Location id from the cascading picker.
+  // Sector/location come from the cascading picker (province -> district -> sector).
   location: z.string().optional(),
 });
 export type FarmInput = z.infer<typeof farmInput>;
@@ -201,8 +198,8 @@ export type Field = z.infer<typeof fieldSchema>;
 export const fieldInput = z.object({
   farm: z.string(),
   name: z.string().min(2),
-  // A section must have a crop; the picker enforces a non-empty selection.
-  crop: z.string().min(1),
+  // Farmers type the crop name freely (crops are open-ended); backend get-or-creates it.
+  crop_name: z.string().min(2),
   planting_date: z.string(),
   growth_stage: growthStageSchema,
   area_hectares: z.number().positive(),

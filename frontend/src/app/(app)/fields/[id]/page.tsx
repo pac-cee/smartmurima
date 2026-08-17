@@ -37,7 +37,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDiseaseReports } from '@/hooks/useDiseaseDetect';
-import { useCrops, useDeleteField, useField, useUpdateField } from '@/hooks/useFields';
+import { useDeleteField, useField, useUpdateField } from '@/hooks/useFields';
 import { useLatestReading } from '@/hooks/useSensorReadings';
 import { fieldInput, growthStageSchema, type Field, type FieldInput } from '@/lib/schemas';
 import { formatDate } from '@/lib/utils';
@@ -48,11 +48,10 @@ function EditFieldDialog({ field }: { field: Field }) {
   const tc = useTranslations('common');
   const [open, setOpen] = useState(false);
   const update = useUpdateField();
-  const { data: crops } = useCrops();
   const defaults: FieldInput = {
     farm: field.farm,
     name: field.name,
-    crop: field.crop ?? '',
+    crop_name: field.crop_name ?? '',
     planting_date: field.planting_date ?? new Date().toISOString().slice(0, 10),
     growth_stage: field.growth_stage,
     area_hectares: field.area_hectares,
@@ -62,7 +61,7 @@ function EditFieldDialog({ field }: { field: Field }) {
     defaultValues: defaults,
   });
 
-  const crop = watch('crop');
+  const cropName = watch('crop_name');
   const stage = watch('growth_stage');
 
   const onSubmit = (values: FieldInput) => {
@@ -104,18 +103,7 @@ function EditFieldDialog({ field }: { field: Field }) {
               <Label>
                 {t('crop')} <span className="text-green-700">*</span>
               </Label>
-              <Select value={crop || undefined} onValueChange={(v) => setValue('crop', v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t('selectCrop')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {crops?.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input id="crop_name" placeholder={t('cropPlaceholder')} {...register('crop_name')} />
             </div>
             <div className="space-y-1.5">
               <Label>{t('growthStage')}</Label>
@@ -155,7 +143,7 @@ function EditFieldDialog({ field }: { field: Field }) {
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
               {tc('cancel')}
             </Button>
-            <Button type="submit" disabled={update.isPending || !crop}>
+            <Button type="submit" disabled={update.isPending || !cropName}>
               {update.isPending && <Loader2 className="size-4 animate-spin" />}
               {tc('save')}
             </Button>

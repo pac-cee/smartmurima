@@ -47,10 +47,7 @@ function EditFarmDialog({ farm }: { farm: Farm }) {
     resolver: zodResolver(farmInput),
     defaultValues: {
       name: farm.name,
-      sector: farm.sector,
       area_hectares: farm.area_hectares,
-      latitude: farm.latitude,
-      longitude: farm.longitude,
     },
   });
 
@@ -74,10 +71,7 @@ function EditFarmDialog({ farm }: { farm: Farm }) {
         if (next) {
           reset({
             name: farm.name,
-            sector: farm.sector,
             area_hectares: farm.area_hectares,
-            latitude: farm.latitude,
-            longitude: farm.longitude,
           });
           setLocation(farm.location ?? undefined);
         }
@@ -99,10 +93,6 @@ function EditFarmDialog({ farm }: { farm: Farm }) {
             {errors.name && <p className="text-xs text-ink-700">{errors.name.message}</p>}
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="edit_sector">{t('sector')}</Label>
-            <Input id="edit_sector" {...register('sector')} />
-          </div>
-          <div className="space-y-1.5">
             <Label>{t('location')}</Label>
             <LocationPicker
               value={location}
@@ -110,34 +100,14 @@ function EditFarmDialog({ farm }: { farm: Farm }) {
               currentLabel={farm.location_name}
             />
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="edit_area">{t('area')}</Label>
-              <Input
-                id="edit_area"
-                type="number"
-                step="0.1"
-                {...register('area_hectares', { valueAsNumber: true })}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit_lat">{t('latitude')}</Label>
-              <Input
-                id="edit_lat"
-                type="number"
-                step="0.0001"
-                {...register('latitude', { valueAsNumber: true })}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit_lng">{t('longitude')}</Label>
-              <Input
-                id="edit_lng"
-                type="number"
-                step="0.0001"
-                {...register('longitude', { valueAsNumber: true })}
-              />
-            </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="edit_area">{t('area')}</Label>
+            <Input
+              id="edit_area"
+              type="number"
+              step="0.1"
+              {...register('area_hectares', { valueAsNumber: true })}
+            />
           </div>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
@@ -229,8 +199,7 @@ export default function FarmDetailPage({ params }: { params: { id: string } }) {
             <div>
               <h1 className="text-2xl font-bold text-ink-900">{farm.name}</h1>
               <p className="mt-1 flex items-center gap-1 text-sm text-ink-500">
-                <MapPin className="size-4" /> {farm.location_name ?? farm.sector} ·{' '}
-                {farm.latitude.toFixed(3)}, {farm.longitude.toFixed(3)}
+                <MapPin className="size-4" /> {farm.location_name ?? farm.sector ?? '—'}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-4">
@@ -260,7 +229,7 @@ export default function FarmDetailPage({ params }: { params: { id: string } }) {
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="flex items-center gap-2 rounded-pill bg-white/95 px-4 py-2 text-sm font-medium text-green-900 shadow-md">
             <MapPin className="size-4 text-green-600" />
-            {farm?.latitude?.toFixed(4)}, {farm?.longitude?.toFixed(4)}
+            {farm?.location_name ?? farm?.sector ?? farm?.name}
           </div>
         </div>
       </div>

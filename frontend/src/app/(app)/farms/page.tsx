@@ -44,7 +44,7 @@ export default function FarmsPage() {
                   </div>
                   <p className="mt-4 text-lg font-semibold text-ink-900">{farm.name}</p>
                   <p className="flex items-center gap-1 text-sm text-ink-500">
-                    <MapPin className="size-3.5" /> {farm.sector}
+                    <MapPin className="size-3.5" /> {farm.location_name ?? farm.sector}
                   </p>
                   <div className="mt-4 flex gap-4 text-xs text-ink-500">
                     <span className="flex items-center gap-1">

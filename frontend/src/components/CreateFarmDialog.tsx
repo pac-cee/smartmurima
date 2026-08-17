@@ -48,7 +48,6 @@ export function CreateFarmDialog({
     formState: { errors },
   } = useForm<FarmInput>({
     resolver: zodResolver(farmInput),
-    defaultValues: { latitude: -2.3, longitude: 30.2 },
   });
 
   const onSubmit = (values: FarmInput) => {
@@ -88,43 +87,19 @@ export function CreateFarmDialog({
             {errors.name && <p className="text-xs text-ink-700">{errors.name.message}</p>}
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="sector">{t('sector')}</Label>
-            <Input id="sector" placeholder="Rweru" {...register('sector')} />
-          </div>
-          <div className="space-y-1.5">
             <Label>
               {t('location')} <span className="text-ink-500">({tc('optional')})</span>
             </Label>
             <LocationPicker value={location} onChange={setLocation} />
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="area">{t('area')}</Label>
-              <Input
-                id="area"
-                type="number"
-                step="0.1"
-                {...register('area_hectares', { valueAsNumber: true })}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="lat">{t('latitude')}</Label>
-              <Input
-                id="lat"
-                type="number"
-                step="0.0001"
-                {...register('latitude', { valueAsNumber: true })}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="lng">{t('longitude')}</Label>
-              <Input
-                id="lng"
-                type="number"
-                step="0.0001"
-                {...register('longitude', { valueAsNumber: true })}
-              />
-            </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="area">{t('area')}</Label>
+            <Input
+              id="area"
+              type="number"
+              step="0.1"
+              {...register('area_hectares', { valueAsNumber: true })}
+            />
           </div>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>

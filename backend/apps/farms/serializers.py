@@ -36,6 +36,9 @@ class FarmSerializer(serializers.ModelSerializer):
 
 class FieldSerializer(serializers.ModelSerializer):
     crop_name = serializers.CharField(source="crop.name", read_only=True)
+    # Farmers type the crop name freely (crops are open-ended); we get-or-create
+    # the Crop record from it. `crop` (id) is still accepted for compatibility.
+    crop_input = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = Field
@@ -44,12 +47,23 @@ class FieldSerializer(serializers.ModelSerializer):
             "farm",
             "crop",
             "crop_name",
+            "crop_input",
             "name",
             "planting_date",
             "growth_stage",
             "area_hectares",
         ]
         read_only_fields = ["id", "crop_name"]
+        extra_kwargs = {"crop": {"required": False, "allow_null": True}}
+
+    def validate(self, attrs):
+        name = (attrs.pop("crop_input", "") or "").strip()
+        if name:
+            crop = Crop.objects.filter(name__iexact=name).first()
+            if crop is None:
+                crop = Crop.objects.create(name=name)
+            attrs["crop"] = crop
+        return attrs
 
 
 class SensorNodeSerializer(serializers.ModelSerializer):

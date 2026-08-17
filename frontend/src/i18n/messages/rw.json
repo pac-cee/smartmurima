@@ -231,7 +231,8 @@
       "flowering": "Kurabya",
       "maturity": "Gukura neza",
       "harvest": "Gusarura"
-    }
+    },
+    "cropPlaceholder": "urugero: Ibigori, Ibishyimbo"
   },
   "recommendations": {
     "title": "Inama",

@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useCreateField, useCrops } from '@/hooks/useFields';
+import { useCreateField } from '@/hooks/useFields';
 import { fieldInput, growthStageSchema, type Field, type FieldInput } from '@/lib/schemas';
 
 /**
@@ -49,7 +49,6 @@ export function CreateFieldDialog({
   const { setFarm, setField } = useSelection();
   const [open, setOpen] = useState(false);
   const create = useCreateField();
-  const { data: crops } = useCrops();
   const { register, handleSubmit, setValue, watch, reset } = useForm<FieldInput>({
     resolver: zodResolver(fieldInput),
     defaultValues: {
@@ -59,7 +58,7 @@ export function CreateFieldDialog({
     },
   });
 
-  const crop = watch('crop');
+  const cropName = watch('crop_name');
   const stage = watch('growth_stage');
 
   const onSubmit = (values: FieldInput) => {
@@ -104,18 +103,7 @@ export function CreateFieldDialog({
               <Label>
                 {t('crop')} <span className="text-green-700">*</span>
               </Label>
-              <Select value={crop || undefined} onValueChange={(v) => setValue('crop', v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t('selectCrop')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {crops?.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input id="crop_name" placeholder={t('cropPlaceholder')} {...register('crop_name')} />
             </div>
             <div className="space-y-1.5">
               <Label>{t('growthStage')}</Label>
@@ -155,7 +143,7 @@ export function CreateFieldDialog({
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
               {tc('cancel')}
             </Button>
-            <Button type="submit" disabled={create.isPending || !crop}>
+            <Button type="submit" disabled={create.isPending || !cropName}>
               {create.isPending && <Loader2 className="size-4 animate-spin" />}
               {tc('create')}
             </Button>
