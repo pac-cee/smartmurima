@@ -7,6 +7,8 @@ import {
   Bell,
   Droplets,
   Gauge,
+  Layers,
+  MapPinned,
   MessageCircle,
   Stethoscope,
   Thermometer,
@@ -14,8 +16,11 @@ import {
 } from 'lucide-react';
 import { AdviceFeed } from '@/components/AdviceFeed';
 import { AlertItem } from '@/components/AlertItem';
+import { CreateFarmDialog } from '@/components/CreateFarmDialog';
+import { CreateFieldDialog } from '@/components/CreateFieldDialog';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { OnboardingPanel } from '@/components/OnboardingPanel';
 import { SensorStatus } from '@/components/SensorStatus';
 import { SensorTrendChart } from '@/components/SensorTrendChart';
 import { useSelection } from '@/components/selection-context';
@@ -26,6 +31,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAlerts } from '@/hooks/useAlerts';
 import { useDiseaseReports } from '@/hooks/useDiseaseDetect';
+import { useFarms } from '@/hooks/useFarms';
 import { useFields } from '@/hooks/useFields';
 import { useLatestReading } from '@/hooks/useSensorReadings';
 import { useSession } from '@/hooks/useAuth';
@@ -35,9 +41,12 @@ export default function DashboardPage() {
   const tc = useTranslations('common');
   const ta = useTranslations('alerts');
   const te = useTranslations('empty');
+  const to = useTranslations('onboarding');
   const { user } = useSession();
   const { farmId, fieldId } = useSelection();
-  const { data: fields } = useFields(farmId ?? undefined);
+  const { data: farms, isLoading: farmsLoading } = useFarms();
+  const activeFarm = farmId ?? farms?.[0]?.id;
+  const { data: fields, isLoading: fieldsLoading } = useFields(activeFarm ?? undefined);
   const effectiveField = fieldId ?? fields?.[0]?.id;
 
   const { data: latest, isLoading: latestLoading } = useLatestReading(effectiveField);
@@ -47,41 +56,96 @@ export default function DashboardPage() {
 
   const firstName = user?.full_name?.split(' ')[0] ?? 'Umuhinzi';
 
+  const header = (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-ink-900">
+          {t('greeting', { name: firstName })}
+        </h1>
+        <p className="mt-1 text-sm text-ink-500">{t('subtitle')}</p>
+      </div>
+      {effectiveField && <SensorStatus lastSeen={latest?.recorded_at ?? null} />}
+    </div>
+  );
+
+  // Golden path for a brand-new farmer: no farms -> create a farm; a farm but no
+  // sections -> create the first section. Only once a section exists do the
+  // data cards render.
+  const noFarms = !farmsLoading && (!farms || farms.length === 0);
+  const noSections = !noFarms && !fieldsLoading && Boolean(activeFarm) && (!fields || fields.length === 0);
+
+  if (noFarms) {
+    return (
+      <div className="space-y-6">
+        {header}
+        <OnboardingPanel
+          icon={MapPinned}
+          title={to('farmTitle')}
+          body={to('farmBody')}
+          action={
+            <CreateFarmDialog
+              trigger={
+                <Button size="lg">
+                  <MapPinned className="size-4" /> {to('farmCta')}
+                </Button>
+              }
+            />
+          }
+        />
+      </div>
+    );
+  }
+
+  if (noSections && activeFarm) {
+    return (
+      <div className="space-y-6">
+        {header}
+        <OnboardingPanel
+          icon={Layers}
+          title={to('sectionTitle')}
+          body={to('sectionBody')}
+          action={
+            <CreateFieldDialog
+              farmId={activeFarm}
+              trigger={
+                <Button size="lg">
+                  <Layers className="size-4" /> {to('sectionCta')}
+                </Button>
+              }
+            />
+          }
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-ink-900">
-            {t('greeting', { name: firstName })}
-          </h1>
-          <p className="mt-1 text-sm text-ink-500">{t('subtitle')}</p>
-        </div>
-        {effectiveField && <SensorStatus lastSeen={latest?.recorded_at ?? null} />}
-      </div>
+      {header}
 
       {/* KPI row */}
-      {latestLoading || !latest ? (
+      {latestLoading ? (
         <StatRowSkeleton />
       ) : (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatTile
             icon={Droplets}
             label={t('kpi.soilMoisture')}
-            value={latest.soil_moisture}
+            value={latest?.soil_moisture ?? null}
             unit="%"
             decimals={1}
           />
           <StatTile
             icon={Thermometer}
             label={t('kpi.temperature')}
-            value={latest.temperature ?? 0}
+            value={latest?.temperature ?? null}
             unit="°C"
             decimals={1}
           />
           <StatTile
             icon={Waves}
             label={t('kpi.humidity')}
-            value={latest.humidity ?? 0}
+            value={latest?.humidity ?? null}
             unit="%"
             decimals={0}
           />

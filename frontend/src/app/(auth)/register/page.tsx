@@ -33,19 +33,20 @@ export default function RegisterPage() {
   });
 
   const onSubmit = (values: RegisterInput) => {
-    signup.mutate(
-      { ...values, location },
-      {
-      onSuccess: (data) => {
-        const params = new URLSearchParams({
-          identifier: data.identifier ?? values.phone_number ?? values.email,
-          purpose: 'register',
-        });
-        // In development the backend returns the OTP (console SMS gateway) so we
-        // can surface it on the verify screen instead of reading server logs.
-        if (data.dev_code) params.set('dev_code', data.dev_code);
-        router.push(`/verify-otp?${params.toString()}`);
-      },
+    // Send only the fields the user actually filled in. Blank email/phone are
+    // omitted so the backend doesn't reject an empty string.
+    const payload: RegisterInput = {
+      full_name: values.full_name,
+      password: values.password,
+      language: values.language ?? locale,
+      ...(values.email ? { email: values.email } : {}),
+      ...(values.phone_number ? { phone_number: values.phone_number } : {}),
+      ...(location ? { location } : {}),
+    };
+    signup.mutate(payload, {
+      // Registration returns { user, tokens } and the hook stores the session,
+      // so we go straight to the dashboard — there is no OTP step.
+      onSuccess: () => router.push('/dashboard'),
       onError: () => toast.error('Could not create your account. Try again.'),
     });
   };
@@ -70,6 +71,9 @@ export default function RegisterPage() {
           <div className="space-y-1.5">
             <Label htmlFor="phone_number">{t('phone')}</Label>
             <Input id="phone_number" autoComplete="tel" placeholder="+250…" {...register('phone_number')} />
+            {errors.phone_number && (
+              <p className="text-xs text-ink-700">{errors.phone_number.message}</p>
+            )}
           </div>
         </div>
         <div className="space-y-1.5">

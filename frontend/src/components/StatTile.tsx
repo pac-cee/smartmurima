@@ -14,7 +14,9 @@ export function StatTile({
 }: {
   icon: LucideIcon;
   label: string;
-  value: number;
+  // `null`/`undefined`/non-finite (e.g. a field with no telemetry yet) renders
+  // an em dash instead of NaN.
+  value: number | null | undefined;
   unit?: string;
   decimals?: number;
   delta?: number;
@@ -23,6 +25,7 @@ export function StatTile({
 }) {
   const trend = delta === undefined ? null : delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat';
   const TrendIcon = trend === 'up' ? ArrowUpRight : trend === 'down' ? ArrowDownRight : Minus;
+  const hasValue = typeof value === 'number' && Number.isFinite(value);
 
   return (
     <div
@@ -51,12 +54,16 @@ export function StatTile({
       <div className="mt-4">
         <p className="text-sm text-ink-500">{label}</p>
         <p className="mt-1 flex items-baseline gap-1">
-          <CountUp
-            value={value}
-            decimals={decimals}
-            className="tabular text-3xl font-bold text-ink-900"
-          />
-          {unit && <span className="text-base font-medium text-ink-500">{unit}</span>}
+          {typeof value === 'number' && Number.isFinite(value) ? (
+            <CountUp
+              value={value}
+              decimals={decimals}
+              className="tabular text-3xl font-bold text-ink-900"
+            />
+          ) : (
+            <span className="tabular text-3xl font-bold text-ink-900">—</span>
+          )}
+          {unit && hasValue && <span className="text-base font-medium text-ink-500">{unit}</span>}
         </p>
       </div>
     </div>

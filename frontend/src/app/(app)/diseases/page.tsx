@@ -1,22 +1,81 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { MapPinned, Stethoscope } from 'lucide-react';
+import { Layers, MapPinned, Stethoscope } from 'lucide-react';
+import { CreateFarmDialog } from '@/components/CreateFarmDialog';
+import { CreateFieldDialog } from '@/components/CreateFieldDialog';
 import { DiseaseUploadCard } from '@/components/DiseaseUploadCard';
 import { EmptyState } from '@/components/EmptyState';
+import { OnboardingPanel } from '@/components/OnboardingPanel';
 import { PageHeader } from '@/components/PageHeader';
 import { useSelection } from '@/components/selection-context';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useDiseaseReports } from '@/hooks/useDiseaseDetect';
+import { useFarms } from '@/hooks/useFarms';
+import { useFields } from '@/hooks/useFields';
 import { relativeTime } from '@/lib/utils';
 
 export default function DiseasesPage() {
   const t = useTranslations('diseases');
+  const to = useTranslations('onboarding');
   const ts = useTranslations('sections');
   // Section to scan against comes from the global top-bar switcher.
-  const { fieldId } = useSelection();
+  const { farmId, fieldId } = useSelection();
+  const { data: farms, isLoading: farmsLoading } = useFarms();
+  const activeFarm = farmId ?? farms?.[0]?.id;
+  const { data: fields, isLoading: fieldsLoading } = useFields(activeFarm ?? undefined);
   const { data: reports } = useDiseaseReports();
+
+  const noFarms = !farmsLoading && (!farms || farms.length === 0);
+  const noSections =
+    !noFarms && !fieldsLoading && Boolean(activeFarm) && (!fields || fields.length === 0);
+
+  if (noFarms) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title={t('title')} subtitle={t('subtitle')} />
+        <OnboardingPanel
+          icon={MapPinned}
+          title={to('farmTitle')}
+          body={to('farmBody')}
+          action={
+            <CreateFarmDialog
+              trigger={
+                <Button size="lg">
+                  <MapPinned className="size-4" /> {to('farmCta')}
+                </Button>
+              }
+            />
+          }
+        />
+      </div>
+    );
+  }
+
+  if (noSections && activeFarm) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title={t('title')} subtitle={t('subtitle')} />
+        <OnboardingPanel
+          icon={Layers}
+          title={to('sectionTitle')}
+          body={to('sectionBody')}
+          action={
+            <CreateFieldDialog
+              farmId={activeFarm}
+              trigger={
+                <Button size="lg">
+                  <Layers className="size-4" /> {to('sectionCta')}
+                </Button>
+              }
+            />
+          }
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

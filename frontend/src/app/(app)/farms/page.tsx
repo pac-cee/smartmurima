@@ -1,131 +1,14 @@
 'use client';
 
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useTranslations } from 'next-intl';
 import Link from 'next/link';
-import { Layers, Loader2, MapPin, MapPinned, Plus, Radio } from 'lucide-react';
-import { toast } from 'sonner';
+import { useTranslations } from 'next-intl';
+import { Layers, MapPin, MapPinned, Radio } from 'lucide-react';
+import { CreateFarmDialog } from '@/components/CreateFarmDialog';
 import { EmptyState } from '@/components/EmptyState';
-import { LocationPicker } from '@/components/LocationPicker';
 import { PageHeader } from '@/components/PageHeader';
 import { ListSkeleton } from '@/components/Skeletons';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useCreateFarm, useFarms } from '@/hooks/useFarms';
-import { farmInput, type FarmInput } from '@/lib/schemas';
-
-function CreateFarmDialog() {
-  const t = useTranslations('farms');
-  const tc = useTranslations('common');
-  const [open, setOpen] = useState(false);
-  const [location, setLocation] = useState<string | undefined>(undefined);
-  const create = useCreateFarm();
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<FarmInput>({
-    resolver: zodResolver(farmInput),
-    defaultValues: { latitude: -2.3, longitude: 30.2 },
-  });
-
-  const onSubmit = (values: FarmInput) => {
-    create.mutate(
-      { ...values, location },
-      {
-        onSuccess: () => {
-          toast.success(t('created'));
-          setOpen(false);
-          reset();
-          setLocation(undefined);
-        },
-      },
-    );
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="size-4" /> {t('add')}
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t('newFarm')}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="name">{t('name')}</Label>
-            <Input id="name" {...register('name')} />
-            {errors.name && <p className="text-xs text-ink-700">{errors.name.message}</p>}
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="sector">{t('sector')}</Label>
-            <Input id="sector" placeholder="Rweru" {...register('sector')} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>
-              {t('location')} <span className="text-ink-500">({tc('optional')})</span>
-            </Label>
-            <LocationPicker value={location} onChange={setLocation} />
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="area">{t('area')}</Label>
-              <Input
-                id="area"
-                type="number"
-                step="0.1"
-                {...register('area_hectares', { valueAsNumber: true })}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="lat">{t('latitude')}</Label>
-              <Input
-                id="lat"
-                type="number"
-                step="0.0001"
-                {...register('latitude', { valueAsNumber: true })}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="lng">{t('longitude')}</Label>
-              <Input
-                id="lng"
-                type="number"
-                step="0.0001"
-                {...register('longitude', { valueAsNumber: true })}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
-              {tc('cancel')}
-            </Button>
-            <Button type="submit" disabled={create.isPending}>
-              {create.isPending && <Loader2 className="size-4 animate-spin" />}
-              {tc('create')}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
+import { useFarms } from '@/hooks/useFarms';
 
 export default function FarmsPage() {
   const t = useTranslations('farms');

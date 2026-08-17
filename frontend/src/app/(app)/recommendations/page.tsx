@@ -1,18 +1,21 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import Link from 'next/link';
-import { MapPinned } from 'lucide-react';
+import { Layers, MapPinned } from 'lucide-react';
 import { AdviceFeed } from '@/components/AdviceFeed';
+import { CreateFarmDialog } from '@/components/CreateFarmDialog';
+import { CreateFieldDialog } from '@/components/CreateFieldDialog';
 import { EmptyState } from '@/components/EmptyState';
+import { OnboardingPanel } from '@/components/OnboardingPanel';
 import { PageHeader } from '@/components/PageHeader';
 import { useSelection } from '@/components/selection-context';
+import { Button } from '@/components/ui/button';
 import { useFarms } from '@/hooks/useFarms';
 import { useFields } from '@/hooks/useFields';
 
 export default function RecommendationsPage() {
   const t = useTranslations('recommendations');
-  const tnav = useTranslations('nav');
+  const to = useTranslations('onboarding');
   const ts = useTranslations('sections');
   // Farm + Section both come from the global top-bar switcher.
   const { farmId, fieldId } = useSelection();
@@ -26,13 +29,18 @@ export default function RecommendationsPage() {
     return (
       <div className="space-y-6">
         <PageHeader title={t('title')} subtitle={t('subtitle')} />
-        <EmptyState
+        <OnboardingPanel
           icon={MapPinned}
-          title={t('noFarm')}
+          title={to('farmTitle')}
+          body={to('farmBody')}
           action={
-            <Link href="/farms" className="text-sm font-medium text-green-700 hover:underline">
-              {tnav('farms')}
-            </Link>
+            <CreateFarmDialog
+              trigger={
+                <Button size="lg">
+                  <MapPinned className="size-4" /> {to('farmCta')}
+                </Button>
+              }
+            />
           }
         />
       </div>
@@ -43,8 +51,22 @@ export default function RecommendationsPage() {
     <div className="space-y-6">
       <PageHeader title={t('title')} subtitle={t('subtitle')} />
 
-      {!fieldsLoading && (!fields || fields.length === 0) ? (
-        <EmptyState icon={MapPinned} title={ts('noSection')} />
+      {!fieldsLoading && activeFarm && (!fields || fields.length === 0) ? (
+        <OnboardingPanel
+          icon={Layers}
+          title={to('sectionTitle')}
+          body={to('sectionBody')}
+          action={
+            <CreateFieldDialog
+              farmId={activeFarm}
+              trigger={
+                <Button size="lg">
+                  <Layers className="size-4" /> {to('sectionCta')}
+                </Button>
+              }
+            />
+          }
+        />
       ) : !fieldId ? (
         <EmptyState
           icon={MapPinned}

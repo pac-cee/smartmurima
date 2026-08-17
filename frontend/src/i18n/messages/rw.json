@@ -32,6 +32,14 @@
     "farm": "Umurima",
     "section": "Igice"
   },
+  "onboarding": {
+    "farmTitle": "Fungura umurima wawe wa mbere",
+    "farmBody": "Ongeraho umurima wawe kugira ngo utangire gukurikirana ubwuzu bw'ubutaka, ikirere n'ubuzima bw'ibihingwa.",
+    "farmCta": "Fungura umurima wawe wa mbere",
+    "sectionTitle": "Ongeraho igice cyawe cya mbere",
+    "sectionBody": "Igice ni ikibanza gifite igihingwa kimwe. Ongeraho kimwe kugira ngo ubone ibipimo bizima n'inama.",
+    "sectionCta": "Ongeraho igice cyawe cya mbere"
+  },
   "location": {
     "label": "Aho iherereye",
     "current": "Ubu",
@@ -162,6 +170,8 @@
     "liveGauges": "Ibipimo bizima",
     "noFarm": "Ongeraho umurima kugira ngo utangire kubona ibipimo bya sensoro.",
     "noField": "Hitamo cyangwa wongereho igice kugira ngo urebe sensoro zawo.",
+    "noReadings": "Nta bipimo birahari",
+    "noReadingsBody": "Ongeraho igikoresho cya sensoro kuri iki gice kugira ngo utangire kubona ibipimo bizima.",
     "noNodes": "Nta sensoro zanditswe kuri iki gice.",
     "addNode": "Ongeraho igikoresho",
     "editNode": "Hindura igikoresho",
@@ -212,7 +222,16 @@
     "deleteConfirm": "Siba “{name}”? Ntibisubirwaho.",
     "deleted": "Igice cyasibwe",
     "added": "Igice cyongewemo",
-    "selectCrop": "Hitamo igihingwa"
+    "selectCrop": "Hitamo igihingwa",
+    "firstSectionTitle": "Ongeraho igice cyawe cya mbere",
+    "firstSectionBody": "Igice ni ikibanza gifite igihingwa kimwe. Ongeraho kimwe kugira ngo utangire kugikurikirana.",
+    "stages": {
+      "germination": "Kumera",
+      "vegetative": "Gukura",
+      "flowering": "Kurabya",
+      "maturity": "Gukura neza",
+      "harvest": "Gusarura"
+    }
   },
   "recommendations": {
     "title": "Inama",

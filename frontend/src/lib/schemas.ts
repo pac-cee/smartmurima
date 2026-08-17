@@ -79,16 +79,25 @@ export type OtpChallenge = z.infer<typeof otpChallengeSchema>;
 
 // Self-registration is always a farmer account; the backend forces the role, so
 // the client never sends one. `roleSchema`/`Role` remain for the user model and
-// nav-item gating.
-export const registerInput = z.object({
-  full_name: z.string().min(2),
-  email: z.string().email(),
-  phone_number: z.string().min(7),
-  password: z.string().min(8),
-  language: languageSchema,
-  // Optional sector Location id chosen from the cascading location picker.
-  location: z.string().optional(),
-});
+// nav-item gating. Registration no longer uses OTP: `POST /auth/register` returns
+// `{ user, tokens }` directly (see `authResultSchema`). At least one of
+// email/phone must be provided; both are otherwise optional.
+export const registerInput = z
+  .object({
+    full_name: z.string().min(2),
+    // Empty string is allowed (the field was left blank); a non-empty value must
+    // be a valid email. The refine below enforces "at least one contact".
+    email: z.union([z.string().email(), z.literal('')]).optional(),
+    phone_number: z.union([z.string().min(7), z.literal('')]).optional(),
+    password: z.string().min(8),
+    language: languageSchema.optional(),
+    // Optional sector Location id chosen from the cascading location picker.
+    location: z.string().optional(),
+  })
+  .refine((v) => Boolean(v.email) || Boolean(v.phone_number), {
+    message: 'Enter an email or a phone number',
+    path: ['phone_number'],
+  });
 export type RegisterInput = z.infer<typeof registerInput>;
 
 export const changePasswordInput = z.object({

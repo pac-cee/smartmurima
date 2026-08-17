@@ -6,18 +6,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import {
-  ArrowLeft,
-  BatteryCharging,
-  Layers,
-  Loader2,
-  MapPin,
-  Pencil,
-  Plus,
-  Radio,
-  Trash2,
-} from 'lucide-react';
+import { ArrowLeft, BatteryCharging, Layers, Loader2, MapPin, Pencil, Radio, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { CreateFieldDialog } from '@/components/CreateFieldDialog';
 import { EmptyState } from '@/components/EmptyState';
 import { LocationPicker } from '@/components/LocationPicker';
 import { ListSkeleton } from '@/components/Skeletons';
@@ -35,136 +26,11 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDeleteFarm, useFarm, useUpdateFarm } from '@/hooks/useFarms';
-import { useCreateField, useCrops, useFields, useNodes } from '@/hooks/useFields';
-import { farmInput, fieldInput, growthStageSchema, type Farm, type FarmInput, type FieldInput } from '@/lib/schemas';
+import { useFields, useNodes } from '@/hooks/useFields';
+import { farmInput, type Farm, type FarmInput } from '@/lib/schemas';
 import { relativeTime } from '@/lib/utils';
-
-function CreateFieldDialog({ farmId }: { farmId: string }) {
-  const t = useTranslations('fields');
-  const tf = useTranslations('farms');
-  const tc = useTranslations('common');
-  const [open, setOpen] = useState(false);
-  const create = useCreateField();
-  const { data: crops } = useCrops();
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    reset,
-  } = useForm<FieldInput>({
-    resolver: zodResolver(fieldInput),
-    defaultValues: {
-      farm: farmId,
-      growth_stage: 'germination',
-      planting_date: new Date().toISOString().slice(0, 10),
-    },
-  });
-
-  const crop = watch('crop');
-  const stage = watch('growth_stage');
-
-  const onSubmit = (values: FieldInput) => {
-    create.mutate(values, {
-      onSuccess: () => {
-        toast.success(t('added'));
-        setOpen(false);
-        reset({ farm: farmId, growth_stage: 'germination' });
-      },
-    });
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm">
-          <Plus className="size-4" /> {t('add')}
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t('newField')}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="name">{tf('name')}</Label>
-            <Input id="name" {...register('name')} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>
-                {t('crop')} <span className="text-green-700">*</span>
-              </Label>
-              <Select value={crop || undefined} onValueChange={(v) => setValue('crop', v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t('selectCrop')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {crops?.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>{t('growthStage')}</Label>
-              <Select
-                value={stage}
-                onValueChange={(v) => setValue('growth_stage', v as FieldInput['growth_stage'])}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {growthStageSchema.options.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="planting_date">{t('plantingDate')}</Label>
-              <Input id="planting_date" type="date" {...register('planting_date')} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="field_area">{tf('area')}</Label>
-              <Input
-                id="field_area"
-                type="number"
-                step="0.1"
-                {...register('area_hectares', { valueAsNumber: true })}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
-              {tc('cancel')}
-            </Button>
-            <Button type="submit" disabled={create.isPending || !crop}>
-              {create.isPending && <Loader2 className="size-4 animate-spin" />}
-              {tc('create')}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 function EditFarmDialog({ farm }: { farm: Farm }) {
   const t = useTranslations('farms');
@@ -428,7 +294,12 @@ export default function FarmDetailPage({ params }: { params: Promise<{ id: strin
                 </Link>
               ))
             ) : (
-              <EmptyState icon={Layers} title={tf('add')} />
+              <EmptyState
+                icon={Layers}
+                title={tf('firstSectionTitle')}
+                description={tf('firstSectionBody')}
+                action={<CreateFieldDialog farmId={id} />}
+              />
             )}
           </CardContent>
         </Card>

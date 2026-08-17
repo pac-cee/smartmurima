@@ -32,6 +32,14 @@
     "farm": "Farm",
     "section": "Section"
   },
+  "onboarding": {
+    "farmTitle": "Create your first farm",
+    "farmBody": "Add your farm to start tracking soil moisture, weather, and crop health.",
+    "farmCta": "Create your first farm",
+    "sectionTitle": "Add your first section",
+    "sectionBody": "A section is a plot planted with one crop. Add one to unlock live readings and advice.",
+    "sectionCta": "Add your first section"
+  },
   "location": {
     "label": "Location",
     "current": "Current",
@@ -162,6 +170,8 @@
     "liveGauges": "Live gauges",
     "noFarm": "Add a farm to start receiving sensor readings.",
     "noField": "Select or add a section to view its sensors.",
+    "noReadings": "No readings yet",
+    "noReadingsBody": "Add a sensor node to this section to start receiving live telemetry.",
     "noNodes": "No sensor nodes are registered on this section yet.",
     "addNode": "Add node",
     "editNode": "Edit node",
@@ -212,7 +222,16 @@
     "deleteConfirm": "Delete “{name}”? This cannot be undone.",
     "deleted": "Section deleted",
     "added": "Section added",
-    "selectCrop": "Choose a crop"
+    "selectCrop": "Choose a crop",
+    "firstSectionTitle": "Add your first section",
+    "firstSectionBody": "A section is a plot planted with one crop. Add one to start tracking it.",
+    "stages": {
+      "germination": "Germination",
+      "vegetative": "Vegetative",
+      "flowering": "Flowering",
+      "maturity": "Maturity",
+      "harvest": "Harvest"
+    }
   },
   "recommendations": {
     "title": "Advice",

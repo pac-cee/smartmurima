@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import Link from 'next/link';
 import {
   BatteryMedium,
   CloudRain,
   Cpu,
   Droplets,
+  Layers,
   Loader2,
   MapPinned,
   Pencil,
@@ -18,8 +18,11 @@ import {
   Waves,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { CreateFarmDialog } from '@/components/CreateFarmDialog';
+import { CreateFieldDialog } from '@/components/CreateFieldDialog';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { OnboardingPanel } from '@/components/OnboardingPanel';
 import { SensorGauge } from '@/components/SensorGauge';
 import { SensorStatus } from '@/components/SensorStatus';
 import { SensorTrendChart } from '@/components/SensorTrendChart';
@@ -258,7 +261,7 @@ const statusVariant: Record<SensorNode['status'], 'soft' | 'muted' | 'outline'> 
 export default function SensorsPage() {
   const t = useTranslations('sensors');
   const ts = useTranslations('sections');
-  const tnav = useTranslations('nav');
+  const to = useTranslations('onboarding');
   const { farmId, fieldId } = useSelection();
 
   const { data: farms, isLoading: farmsLoading } = useFarms();
@@ -273,48 +276,157 @@ export default function SensorsPage() {
   const { data: latest, isLoading: latestLoading } = useLatestReading(activeField ?? undefined);
   const { data: nodes, isLoading: nodesLoading } = useNodes(activeField ?? undefined);
 
+  // No farms yet — start the golden path (create a farm).
   if (!farmsLoading && (!farms || farms.length === 0)) {
     return (
       <div className="space-y-6">
         <Header t={t} lastSeen={null} />
-        <EmptyState
+        <OnboardingPanel
           icon={MapPinned}
-          title={t('noFarm')}
+          title={to('farmTitle')}
+          body={to('farmBody')}
           action={
-            <Link href="/farms" className="text-sm font-medium text-green-700 hover:underline">
-              {tnav('farms')}
-            </Link>
+            <CreateFarmDialog
+              trigger={
+                <Button size="lg">
+                  <MapPinned className="size-4" /> {to('farmCta')}
+                </Button>
+              }
+            />
           }
         />
       </div>
     );
   }
 
+  // A farm exists but has no sections — prompt to create the first one.
+  if (!fieldsLoading && activeFarm && (!fields || fields.length === 0)) {
+    return (
+      <div className="space-y-6">
+        <Header t={t} lastSeen={null} />
+        <OnboardingPanel
+          icon={Layers}
+          title={to('sectionTitle')}
+          body={to('sectionBody')}
+          action={
+            <CreateFieldDialog
+              farmId={activeFarm}
+              trigger={
+                <Button size="lg">
+                  <Layers className="size-4" /> {to('sectionCta')}
+                </Button>
+              }
+            />
+          }
+        />
+      </div>
+    );
+  }
+
+  const nodesCard = (
+    <Card>
+      <CardHeader className="flex-row items-start justify-between gap-3">
+        <div className="min-w-0">
+          <CardTitle>{t('nodes')}</CardTitle>
+          {section && (
+            <p className="mt-1 truncate text-xs text-ink-500">
+              {section.name}
+              {farm ? ` · ${farm.name}` : ''}
+            </p>
+          )}
+        </div>
+        {activeField && <AddNodeDialog fieldId={activeField} />}
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {nodesLoading ? (
+          <ListSkeleton rows={2} />
+        ) : nodes && nodes.length > 0 ? (
+          nodes.map((node) => (
+            <div
+              key={node.id}
+              className="flex items-center justify-between gap-2 rounded-tile border border-line p-3"
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="grid size-9 shrink-0 place-items-center rounded-tile bg-green-50 text-green-700">
+                  <Cpu className="size-4" />
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate font-mono text-sm font-semibold text-ink-900">
+                    {node.device_id}
+                  </p>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-500">
+                    <span className="flex items-center gap-1">
+                      <BatteryMedium className="size-3.5" />
+                      {Math.round(node.battery)}%
+                    </span>
+                    <SensorStatus lastSeen={node.last_seen} />
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <Badge variant={statusVariant[node.status]}>{t(`statuses.${node.status}`)}</Badge>
+                <EditNodeDialog node={node} />
+                <DeleteNodeDialog node={node} />
+              </div>
+            </div>
+          ))
+        ) : (
+          <EmptyState
+            icon={Radio}
+            title={t('noNodes')}
+            action={activeField ? <AddNodeDialog fieldId={activeField} /> : undefined}
+          />
+        )}
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="space-y-6">
       <Header t={t} lastSeen={latest?.recorded_at ?? null} />
 
-      {!fieldsLoading && (!fields || fields.length === 0) ? (
-        <EmptyState icon={MapPinned} title={ts('noSection')} />
-      ) : !activeField ? (
+      {!activeField ? (
         <EmptyState
           icon={MapPinned}
           title={ts('selectPrompt')}
           description={ts('selectPromptBody')}
         />
+      ) : latestLoading ? (
+        <>
+          <StatRowSkeleton />
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('liveGauges')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap justify-around gap-6">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="size-40 animate-pulse rounded-pill bg-[var(--surface-muted)]" />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      ) : !latest ? (
+        // Section selected but no telemetry yet.
+        <>
+          <EmptyState
+            icon={Radio}
+            title={t('noReadings')}
+            description={t('noReadingsBody')}
+            action={activeField ? <AddNodeDialog fieldId={activeField} /> : undefined}
+          />
+          {nodesCard}
+        </>
       ) : (
         <>
           {/* KPI row */}
-          {latestLoading || !latest ? (
-            <StatRowSkeleton />
-          ) : (
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              <StatTile icon={Droplets} label={t('soil_moisture')} value={latest.soil_moisture} unit="%" decimals={1} />
-              <StatTile icon={Thermometer} label={t('temperature')} value={latest.temperature ?? 0} unit="°C" decimals={1} />
-              <StatTile icon={Waves} label={t('humidity')} value={latest.humidity ?? 0} unit="%" />
-              <StatTile icon={CloudRain} label={t('rainfall')} value={latest.rainfall ?? 0} unit="mm" decimals={1} />
-            </div>
-          )}
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <StatTile icon={Droplets} label={t('soil_moisture')} value={latest.soil_moisture} unit="%" decimals={1} />
+            <StatTile icon={Thermometer} label={t('temperature')} value={latest.temperature ?? null} unit="°C" decimals={1} />
+            <StatTile icon={Waves} label={t('humidity')} value={latest.humidity ?? null} unit="%" />
+            <StatTile icon={CloudRain} label={t('rainfall')} value={latest.rainfall ?? null} unit="mm" decimals={1} />
+          </div>
 
           {/* Live gauges */}
           <Card>
@@ -322,19 +434,11 @@ export default function SensorsPage() {
               <CardTitle>{t('liveGauges')}</CardTitle>
             </CardHeader>
             <CardContent>
-              {latestLoading || !latest ? (
-                <div className="flex flex-wrap justify-around gap-6">
-                  {[0, 1, 2].map((i) => (
-                    <div key={i} className="size-40 animate-pulse rounded-pill bg-[var(--surface-muted)]" />
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-wrap items-center justify-around gap-8">
-                  <SensorGauge value={latest.soil_moisture} min={0} max={100} unit="%" decimals={1} label={t('soil_moisture')} optimalMin={30} optimalMax={55} />
-                  <SensorGauge value={latest.temperature ?? 0} min={0} max={45} unit="°C" decimals={1} label={t('temperature')} optimalMin={18} optimalMax={30} />
-                  <SensorGauge value={latest.humidity ?? 0} min={0} max={100} unit="%" label={t('humidity')} optimalMin={40} optimalMax={75} />
-                </div>
-              )}
+              <div className="flex flex-wrap items-center justify-around gap-8">
+                <SensorGauge value={latest.soil_moisture} min={0} max={100} unit="%" decimals={1} label={t('soil_moisture')} optimalMin={30} optimalMax={55} />
+                <SensorGauge value={latest.temperature ?? 0} min={0} max={45} unit="°C" decimals={1} label={t('temperature')} optimalMin={18} optimalMax={30} />
+                <SensorGauge value={latest.humidity ?? 0} min={0} max={100} unit="%" label={t('humidity')} optimalMin={40} optimalMax={75} />
+              </div>
             </CardContent>
           </Card>
 
@@ -352,63 +456,7 @@ export default function SensorsPage() {
             </Card>
 
             {/* Sensor node management */}
-            <Card>
-              <CardHeader className="flex-row items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <CardTitle>{t('nodes')}</CardTitle>
-                  {section && (
-                    <p className="mt-1 truncate text-xs text-ink-500">
-                      {section.name}
-                      {farm ? ` · ${farm.name}` : ''}
-                    </p>
-                  )}
-                </div>
-                {activeField && <AddNodeDialog fieldId={activeField} />}
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {nodesLoading ? (
-                  <ListSkeleton rows={2} />
-                ) : nodes && nodes.length > 0 ? (
-                  nodes.map((node) => (
-                    <div
-                      key={node.id}
-                      className="flex items-center justify-between gap-2 rounded-tile border border-line p-3"
-                    >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <span className="grid size-9 shrink-0 place-items-center rounded-tile bg-green-50 text-green-700">
-                          <Cpu className="size-4" />
-                        </span>
-                        <div className="min-w-0">
-                          <p className="truncate font-mono text-sm font-semibold text-ink-900">
-                            {node.device_id}
-                          </p>
-                          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-500">
-                            <span className="flex items-center gap-1">
-                              <BatteryMedium className="size-3.5" />
-                              {Math.round(node.battery)}%
-                            </span>
-                            <SensorStatus lastSeen={node.last_seen} />
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Badge variant={statusVariant[node.status]}>
-                          {t(`statuses.${node.status}`)}
-                        </Badge>
-                        <EditNodeDialog node={node} />
-                        <DeleteNodeDialog node={node} />
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <EmptyState
-                    icon={Radio}
-                    title={t('noNodes')}
-                    action={activeField ? <AddNodeDialog fieldId={activeField} /> : undefined}
-                  />
-                )}
-              </CardContent>
-            </Card>
+            {nodesCard}
           </div>
         </>
       )}
