@@ -260,7 +260,7 @@ class AuthService(BaseService):
             full_name=data["full_name"],
             role=Role.FARMER,
             language=data.get("language", "rw"),
-            is_active=True,
+            is_active=False,
         )
         user.set_password(data["password"])
         user.save(update_fields=["password"])
@@ -271,9 +271,8 @@ class AuthService(BaseService):
         if location is not None:
             self.farmer_repo.update(farmer, location=location)
 
-        # No OTP: self-service farmers are activated immediately and get JWT
-        # tokens so registration lands them straight in the app.
-        return {"user": user, "tokens": self.tokens_for(user)}
+        identifier = phone or email
+        return self.otp_service.issue(identifier, OtpPurpose.REGISTER, user=user)
 
     def verify_registration(self, identifier: str, code: str) -> dict:
         user = self.otp_service.verify(identifier, code, OtpPurpose.REGISTER)

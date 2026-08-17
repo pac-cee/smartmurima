@@ -46,11 +46,7 @@ class RegisterView(APIView):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         result = AuthService().register(serializer.validated_data)
-        # No OTP step: registration returns the user + JWT tokens directly.
-        return Response(
-            {"user": UserSerializer(result["user"]).data, "tokens": result["tokens"]},
-            status=status.HTTP_201_CREATED,
-        )
+        return Response(_issue_payload(result), status=status.HTTP_201_CREATED)
 
 
 class OtpVerifyView(APIView):

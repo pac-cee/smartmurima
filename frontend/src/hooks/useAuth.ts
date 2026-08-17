@@ -51,15 +51,13 @@ export function useLogin() {
   });
 }
 
-// Registration no longer uses OTP. `POST /auth/register` returns
-// `{ user, tokens }` directly (same shape as login), so we store the session
-// immediately and let the page redirect straight to the dashboard.
+// Registration uses OTP. `POST /auth/register` returns an OTP "challenge"
+// ({ identifier, purpose, expires_at, dev_code? }) and does NOT return tokens,
+// so no session is stored here. The page routes to /verify-otp, where the user
+// enters the code and `useVerifyOtp` establishes the session.
 export function useRegister() {
-  return useMutation<AuthResult, Error, RegisterInput>({
-    mutationFn: (input) => api.post('/auth/register', input, authResultSchema, { auth: false }),
-    onSuccess: (data) => {
-      tokenStore.setSession(data.tokens.access, data.tokens.refresh, data.user);
-    },
+  return useMutation<OtpChallenge, Error, RegisterInput>({
+    mutationFn: (input) => api.post('/auth/register', input, otpChallengeSchema, { auth: false }),
   });
 }
 

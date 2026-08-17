@@ -46,15 +46,25 @@ function page<T>(items: T[]) {
 
 export const handlers = [
   /* ---------- auth ---------- */
-  // Mirrors the real backend: register now returns { user, tokens } directly
-  // (no OTP). resend/reset still return an OTP "challenge" (with a dev_code in
-  // dev), and verify/login return { user, tokens }.
-  http.post(u('/auth/register'), async () =>
-    HttpResponse.json(
-      { user: mockUser, tokens: { access: ACCESS, refresh: REFRESH } },
+  // Mirrors the real backend: register returns an OTP "challenge" (with a
+  // dev_code in dev) and no tokens. resend/reset also return a challenge, and
+  // verify/login return { user, tokens }.
+  http.post(u('/auth/register'), async ({ request }) => {
+    const body = (await request.json().catch(() => ({}))) as {
+      email?: string;
+      phone_number?: string;
+    };
+    const identifier = body.email || body.phone_number || mockUser.email;
+    return HttpResponse.json(
+      {
+        identifier,
+        purpose: 'register',
+        expires_at: new Date(Date.now() + 10 * 60000).toISOString(),
+        dev_code: DEV_CODE,
+      },
       { status: 201 },
-    ),
-  ),
+    );
+  }),
   http.post(u('/auth/otp/verify'), async () =>
     HttpResponse.json({ user: mockUser, tokens: { access: ACCESS, refresh: REFRESH } }),
   ),

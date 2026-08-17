@@ -43,10 +43,16 @@ export default function RegisterPage() {
       ...(values.phone_number ? { phone_number: values.phone_number } : {}),
       ...(location ? { location } : {}),
     };
+    // The identifier the user will verify: prefer email, fall back to phone.
+    const identifier = values.email || values.phone_number || '';
     signup.mutate(payload, {
-      // Registration returns { user, tokens } and the hook stores the session,
-      // so we go straight to the dashboard — there is no OTP step.
-      onSuccess: () => router.push('/dashboard'),
+      // Registration returns an OTP challenge (no tokens). Route to /verify-otp
+      // with the identifier so the user can enter the code and sign in there.
+      onSuccess: (challenge) => {
+        const query = new URLSearchParams({ identifier, purpose: 'register' });
+        if (challenge.dev_code) query.set('dev_code', challenge.dev_code);
+        router.push(`/verify-otp?${query.toString()}`);
+      },
       onError: () => toast.error('Could not create your account. Try again.'),
     });
   };

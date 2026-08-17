@@ -66,8 +66,9 @@ export const authResultSchema = z.object({
 });
 export type AuthResult = z.infer<typeof authResultSchema>;
 
-// register / otp-resend / password-reset-request all return an OTP "challenge".
-// In development (console SMS gateway) the backend also returns `dev_code`.
+// register / otp-resend / password-reset-request all return an OTP "challenge":
+// { identifier, purpose, expires_at, detail?, dev_code? }. In development
+// (console SMS gateway) the backend also returns `dev_code`.
 export const otpChallengeSchema = z.object({
   identifier: z.string().optional(),
   purpose: z.string().optional(),
@@ -79,9 +80,9 @@ export type OtpChallenge = z.infer<typeof otpChallengeSchema>;
 
 // Self-registration is always a farmer account; the backend forces the role, so
 // the client never sends one. `roleSchema`/`Role` remain for the user model and
-// nav-item gating. Registration no longer uses OTP: `POST /auth/register` returns
-// `{ user, tokens }` directly (see `authResultSchema`). At least one of
-// email/phone must be provided; both are otherwise optional.
+// nav-item gating. `POST /auth/register` returns an OTP challenge (see
+// `otpChallengeSchema`), not tokens. At least one of email/phone must be
+// provided; both are otherwise optional.
 export const registerInput = z
   .object({
     full_name: z.string().min(2),

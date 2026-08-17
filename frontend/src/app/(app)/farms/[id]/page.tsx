@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
@@ -198,8 +198,8 @@ function DeleteFarmDialog({ farm }: { farm: Farm }) {
   );
 }
 
-export default function FarmDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function FarmDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const t = useTranslations('farms');
   const tf = useTranslations('fields');
   const ts = useTranslations('sensors');
