@@ -28,6 +28,10 @@ export function useSessionMessages(sessionId: string | undefined) {
   });
 }
 
+// A slow or unreachable LLM must not hang the chat forever; abort the request
+// after this many milliseconds so the UI can surface an error.
+const CHAT_TIMEOUT_MS = 120_000;
+
 export function useSendMessage() {
   const qc = useQueryClient();
   return useMutation<
@@ -35,7 +39,17 @@ export function useSendMessage() {
     Error,
     { question: string; language: 'rw' | 'en'; session?: string }
   >({
-    mutationFn: (input) => api.post('/assistant/chat', input, chatResponseSchema),
+    mutationFn: async (input) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
+      try {
+        return await api.post('/assistant/chat', input, chatResponseSchema, {
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+    },
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({ queryKey: ['assistant', 'messages', vars.session] });
       void qc.invalidateQueries({ queryKey: ['assistant', 'sessions'] });

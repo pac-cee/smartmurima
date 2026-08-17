@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useLocale, useTranslations } from 'next-intl';
@@ -7,50 +8,50 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { LocationPicker } from '@/components/LocationPicker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useRegister } from '@/hooks/useAuth';
-import { registerInput, roleSchema, type RegisterInput, type Role } from '@/lib/schemas';
-
-const roles = roleSchema.options;
+import { registerInput, type RegisterInput } from '@/lib/schemas';
 
 export default function RegisterPage() {
   const t = useTranslations('auth');
+  const tc = useTranslations('common');
+  const tl = useTranslations('location');
   const locale = useLocale() as 'rw' | 'en';
   const router = useRouter();
   const signup = useRegister();
+  const [location, setLocation] = useState<string | undefined>(undefined);
   const {
     register,
     handleSubmit,
-    setValue,
-    watch,
     formState: { errors },
   } = useForm<RegisterInput>({
     resolver: zodResolver(registerInput),
-    defaultValues: { role: 'farmer', language: locale },
+    defaultValues: { language: locale },
   });
 
-  const role = watch('role');
-
   const onSubmit = (values: RegisterInput) => {
-    signup.mutate(values, {
-      onSuccess: (data) => {
-        const params = new URLSearchParams({
-          identifier: data.identifier ?? values.phone_number ?? values.email,
-          purpose: 'register',
-        });
-        // In development the backend returns the OTP (console SMS gateway) so we
-        // can surface it on the verify screen instead of reading server logs.
-        if (data.dev_code) params.set('dev_code', data.dev_code);
-        router.push(`/verify-otp?${params.toString()}`);
+    // Send only the fields the user actually filled in. Blank email/phone are
+    // omitted so the backend doesn't reject an empty string.
+    const payload: RegisterInput = {
+      full_name: values.full_name,
+      password: values.password,
+      language: values.language ?? locale,
+      ...(values.email ? { email: values.email } : {}),
+      ...(values.phone_number ? { phone_number: values.phone_number } : {}),
+      ...(location ? { location } : {}),
+    };
+    // The identifier the user will verify: prefer email, fall back to phone.
+    const identifier = values.email || values.phone_number || '';
+    signup.mutate(payload, {
+      // Registration returns an OTP challenge (no tokens). Route to /verify-otp
+      // with the identifier so the user can enter the code and sign in there.
+      onSuccess: (challenge) => {
+        const query = new URLSearchParams({ identifier, purpose: 'register' });
+        if (challenge.dev_code) query.set('dev_code', challenge.dev_code);
+        router.push(`/verify-otp?${query.toString()}`);
       },
       onError: () => toast.error('Could not create your account. Try again.'),
     });
@@ -76,6 +77,9 @@ export default function RegisterPage() {
           <div className="space-y-1.5">
             <Label htmlFor="phone_number">{t('phone')}</Label>
             <Input id="phone_number" autoComplete="tel" placeholder="+250…" {...register('phone_number')} />
+            {errors.phone_number && (
+              <p className="text-xs text-ink-700">{errors.phone_number.message}</p>
+            )}
           </div>
         </div>
         <div className="space-y-1.5">
@@ -83,20 +87,12 @@ export default function RegisterPage() {
           <Input id="password" type="password" autoComplete="new-password" {...register('password')} />
           {errors.password && <p className="text-xs text-ink-700">{errors.password.message}</p>}
         </div>
+
         <div className="space-y-1.5">
-          <Label>{t('role')}</Label>
-          <Select value={role} onValueChange={(v) => setValue('role', v as Role)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {roles.map((r) => (
-                <SelectItem key={r} value={r}>
-                  {t(`roles.${r}`)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label>
+            {tl('label')} <span className="text-ink-500">({tc('optional')})</span>
+          </Label>
+          <LocationPicker value={location} onChange={setLocation} />
         </div>
 
         <Button type="submit" size="lg" className="w-full" disabled={signup.isPending}>

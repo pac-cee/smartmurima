@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useLocale } from 'next-intl';
 import { BookOpen, Send, Sparkles } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useSendMessage, useSessionMessages } from '@/hooks/useAssistant';
@@ -140,6 +141,14 @@ export function AssistantChat({ sessionId }: { sessionId?: string }) {
               ]);
             }
           }, 35);
+        },
+        onError: () => {
+          // Drop the stuck optimistic user bubble and clear any typing state so
+          // the dots don't spin forever.
+          setStreamed(null);
+          setLocalMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
+          setInput(q);
+          toast.error(t('sendFailed'));
         },
       },
     );

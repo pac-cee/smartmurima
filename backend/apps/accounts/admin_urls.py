@@ -11,7 +11,7 @@ from .views import UserAdminViewSet
 
 app_name = "admin_api"
 
-router = DefaultRouter()
+router = DefaultRouter(trailing_slash=False)
 router.register("users", UserAdminViewSet, basename="admin-users")
 router.register("sensor-nodes", SensorNodeViewSet, basename="admin-sensor-nodes")
 router.register("documents", DocumentViewSet, basename="admin-documents")

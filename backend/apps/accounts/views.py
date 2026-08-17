@@ -15,8 +15,10 @@ from .serializers import (
     LoginSerializer,
     OtpResendSerializer,
     OtpVerifySerializer,
+    PasswordChangeSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
+    ProfileUpdateSerializer,
     RegisterSerializer,
     UserSerializer,
 )
@@ -128,15 +130,30 @@ class PasswordResetConfirmView(APIView):
         return Response({"detail": "Password updated. You can now sign in."})
 
 
+class PasswordChangeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(request=PasswordChangeSerializer)
+    def post(self, request):
+        serializer = PasswordChangeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        AuthService().change_password(
+            request.user,
+            serializer.validated_data["old_password"],
+            serializer.validated_data["new_password"],
+        )
+        return Response({"detail": "Password updated."})
+
+
 class MeView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         return Response(UserSerializer(request.user).data)
 
-    @extend_schema(request=UserSerializer, responses=UserSerializer)
+    @extend_schema(request=ProfileUpdateSerializer, responses=UserSerializer)
     def patch(self, request):
-        serializer = UserSerializer(data=request.data, partial=True)
+        serializer = ProfileUpdateSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         user = AuthService().update_profile(request.user, serializer.validated_data)
         return Response(UserSerializer(user).data)

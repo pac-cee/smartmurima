@@ -7,10 +7,27 @@ import type {
   Farm,
   Field,
   KnowledgeDoc,
+  Location,
   Recommendation,
   SensorNode,
   User,
 } from '@/lib/schemas';
+
+export const mockLocations: Location[] = [
+  // provinces
+  { id: 'p-east', name: 'Eastern Province', level: 'province', parent: null },
+  { id: 'p-kigali', name: 'Kigali City', level: 'province', parent: null },
+  // districts
+  { id: 'd-bugesera', name: 'Bugesera', level: 'district', parent: 'p-east', parent_name: 'Eastern Province' },
+  { id: 'd-rwamagana', name: 'Rwamagana', level: 'district', parent: 'p-east', parent_name: 'Eastern Province' },
+  { id: 'd-gasabo', name: 'Gasabo', level: 'district', parent: 'p-kigali', parent_name: 'Kigali City' },
+  // sectors
+  { id: 's-rweru', name: 'Rweru', level: 'sector', parent: 'd-bugesera', parent_name: 'Bugesera' },
+  { id: 's-nyamata', name: 'Nyamata', level: 'sector', parent: 'd-bugesera', parent_name: 'Bugesera' },
+  { id: 's-gashora', name: 'Gashora', level: 'sector', parent: 'd-bugesera', parent_name: 'Bugesera' },
+  { id: 's-fumbwe', name: 'Fumbwe', level: 'sector', parent: 'd-rwamagana', parent_name: 'Rwamagana' },
+  { id: 's-remera', name: 'Remera', level: 'sector', parent: 'd-gasabo', parent_name: 'Gasabo' },
+];
 
 export const mockUser: User = {
   id: 'u1',
@@ -20,6 +37,8 @@ export const mockUser: User = {
   role: 'farmer',
   language: 'rw',
   is_active: true,
+  location: 's-rweru',
+  location_path: 'Eastern Province / Bugesera / Rweru',
   created_at: '2025-01-12T08:00:00Z',
 };
 
@@ -72,6 +91,8 @@ export const mockFarms: Farm[] = [
     area_hectares: 4.5,
     field_count: 3,
     node_count: 4,
+    location: 's-rweru',
+    location_name: 'Rweru',
     created_at: '2025-02-01T08:00:00Z',
   },
   {

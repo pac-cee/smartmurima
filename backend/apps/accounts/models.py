@@ -100,6 +100,15 @@ class Farmer(models.Model):
         User, on_delete=models.CASCADE, related_name="farmer_profile"
     )
     cooperative_name = models.CharField(max_length=255, blank=True, default="")
+    # The location a farmer is connected to (sector level in practice). Kept as a
+    # string reference so accounts need not import the locations app.
+    location = models.ForeignKey(
+        "locations.Location",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="farmers",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

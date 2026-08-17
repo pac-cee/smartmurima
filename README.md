@@ -35,19 +35,33 @@ smartmurima/
 
 ## Quick start
 ```bash
-cp .env.example .env
-docker compose up --build
-# then, one-time, pull the models into Ollama:
-docker exec sm_ollama ollama pull llama3.1:8b
-docker exec sm_ollama ollama pull nomic-embed-text
-docker exec sm_backend python manage.py seed_knowledge
-docker exec sm_backend python manage.py seed_demo
+cp .env.example .env          # first time only
+docker compose up -d --build  # brings up the whole stack
+```
+On boot the `backend` service automatically runs migrations, creates the default
+admin, and seeds the demo farmer/farm/fields/nodes. A one-shot `ollama-init`
+service pulls the LLM + embedding models in the background — the assistant works
+as soon as they finish (and degrades gracefully until then).
+
+To stream simulated IoT telemetry for the seeded nodes (`SM-NODE-01`/`SM-NODE-02`):
+```bash
+docker compose --profile iot up -d --build simulator
+docker compose logs -f simulator   # watch it publish every SIM_INTERVAL seconds
 ```
 
+### URLs
 | Service | URL |
 |---|---|
 | Frontend | http://localhost:3000 |
-| API + Swagger | http://localhost:8000/api/docs |
+| Backend API | http://localhost:8000/api/v1 |
+| Django admin | http://localhost:8000/admin |
+| API docs (Swagger) | http://localhost:8000/api/docs |
 | pgAdmin | http://localhost:5050 |
 | Ollama | http://localhost:11434 |
 | MQTT | mqtt://localhost:1883 |
+
+### Dev credentials
+| Where | Username / email | Password |
+|---|---|---|
+| Django admin | `admin` | `admin12345` |
+| Demo farmer (app login) | `farmer@smartmurima.rw` | `farmer12345` |

@@ -43,6 +43,12 @@ export const userSchema = z.object({
   role: roleSchema,
   language: languageSchema,
   is_active: z.boolean(),
+  // Optional sector Location the account is anchored to. `location` is the id;
+  // `location_path` is a display string like "Province / District / Sector".
+  // Both are coded defensively (nullable/optional) in case an older backend
+  // build omits them.
+  location: idSchema.nullable().optional(),
+  location_path: z.string().nullable().optional(),
   created_at: z.string().optional(),
 });
 export type User = z.infer<typeof userSchema>;
@@ -60,8 +66,9 @@ export const authResultSchema = z.object({
 });
 export type AuthResult = z.infer<typeof authResultSchema>;
 
-// register / otp-resend / password-reset-request all return an OTP "challenge".
-// In development (console SMS gateway) the backend also returns `dev_code`.
+// register / otp-resend / password-reset-request all return an OTP "challenge":
+// { identifier, purpose, expires_at, detail?, dev_code? }. In development
+// (console SMS gateway) the backend also returns `dev_code`.
 export const otpChallengeSchema = z.object({
   identifier: z.string().optional(),
   purpose: z.string().optional(),
@@ -71,15 +78,34 @@ export const otpChallengeSchema = z.object({
 });
 export type OtpChallenge = z.infer<typeof otpChallengeSchema>;
 
-export const registerInput = z.object({
-  full_name: z.string().min(2),
-  email: z.string().email(),
-  phone_number: z.string().min(7),
-  password: z.string().min(8),
-  role: roleSchema,
-  language: languageSchema,
-});
+// Self-registration is always a farmer account; the backend forces the role, so
+// the client never sends one. `roleSchema`/`Role` remain for the user model and
+// nav-item gating. `POST /auth/register` returns an OTP challenge (see
+// `otpChallengeSchema`), not tokens. At least one of email/phone must be
+// provided; both are otherwise optional.
+export const registerInput = z
+  .object({
+    full_name: z.string().min(2),
+    // Empty string is allowed (the field was left blank); a non-empty value must
+    // be a valid email. The refine below enforces "at least one contact".
+    email: z.union([z.string().email(), z.literal('')]).optional(),
+    phone_number: z.union([z.string().min(7), z.literal('')]).optional(),
+    password: z.string().min(8),
+    language: languageSchema.optional(),
+    // Optional sector Location id chosen from the cascading location picker.
+    location: z.string().optional(),
+  })
+  .refine((v) => Boolean(v.email) || Boolean(v.phone_number), {
+    message: 'Enter an email or a phone number',
+    path: ['phone_number'],
+  });
 export type RegisterInput = z.infer<typeof registerInput>;
+
+export const changePasswordInput = z.object({
+  old_password: z.string().min(1),
+  new_password: z.string().min(8),
+});
+export type ChangePasswordInput = z.infer<typeof changePasswordInput>;
 
 export const loginInput = z.object({
   identifier: z.string().min(3),
@@ -102,6 +128,25 @@ export const passwordResetConfirmInput = z.object({
 });
 export type PasswordResetConfirmInput = z.infer<typeof passwordResetConfirmInput>;
 
+/* ---------- locations (public read) ----------
+ * Cascading administrative units: province -> district -> sector. The list
+ * endpoint returns a plain array (not paginated). `parent`/`parent_name` are
+ * null for the top level (provinces).
+ */
+export const locationLevelSchema = z.enum(['province', 'district', 'sector']);
+export type LocationLevel = z.infer<typeof locationLevelSchema>;
+
+export const locationSchema = z.object({
+  id: idSchema,
+  name: z.string(),
+  level: locationLevelSchema,
+  parent: idSchema.nullable(),
+  parent_name: z.string().nullable().optional(),
+});
+export type Location = z.infer<typeof locationSchema>;
+
+export const locationListSchema = z.array(locationSchema);
+
 /* ---------- farms / fields / crops / nodes ---------- */
 export const farmSchema = z.object({
   id: idSchema,
@@ -112,16 +157,18 @@ export const farmSchema = z.object({
   area_hectares: decimalSchema,
   field_count: z.number().optional(),
   node_count: z.number().optional(),
+  // Optional sector Location: `location` is the id, `location_name` its label.
+  location: idSchema.nullable().optional(),
+  location_name: z.string().nullable().optional(),
   created_at: z.string().optional(),
 });
 export type Farm = z.infer<typeof farmSchema>;
 
 export const farmInput = z.object({
   name: z.string().min(2),
-  sector: z.string().min(2),
-  latitude: z.number().min(-90).max(90),
-  longitude: z.number().min(-180).max(180),
   area_hectares: z.number().positive(),
+  // Sector/location come from the cascading picker (province -> district -> sector).
+  location: z.string().optional(),
 });
 export type FarmInput = z.infer<typeof farmInput>;
 
@@ -151,7 +198,8 @@ export type Field = z.infer<typeof fieldSchema>;
 export const fieldInput = z.object({
   farm: z.string(),
   name: z.string().min(2),
-  crop: z.string(),
+  // Farmers type the crop name freely (crops are open-ended); backend get-or-creates it.
+  crop_name: z.string().min(2),
   planting_date: z.string(),
   growth_stage: growthStageSchema,
   area_hectares: z.number().positive(),
@@ -168,6 +216,15 @@ export type Crop = z.infer<typeof cropSchema>;
 
 // Matches apps.farms.models.NodeStatus.
 export const nodeStatusSchema = z.enum(['active', 'inactive', 'maintenance']);
+export type NodeStatus = z.infer<typeof nodeStatusSchema>;
+
+export const sensorNodeInput = z.object({
+  field: z.string().min(1),
+  device_id: z.string().min(2),
+  status: nodeStatusSchema.optional(),
+  battery: z.number().optional(),
+});
+export type SensorNodeInput = z.infer<typeof sensorNodeInput>;
 
 export const sensorNodeSchema = z.object({
   id: idSchema,
@@ -216,6 +273,27 @@ export const recommendationSchema = z.object({
   created_at: z.string(),
 });
 export type Recommendation = z.infer<typeof recommendationSchema>;
+
+// GET /recommendations/latest?field=<id> returns the freshest auto-generated
+// bundle for a field: one item per advice type. Items are lighter than the
+// history `Recommendation` (no id/created_at). Coded defensively so a partial
+// or empty bundle (field with no advice yet) still parses.
+export const adviceItemSchema = z.object({
+  type: recommendationTypeSchema,
+  decision: z.string(),
+  value: z.number().nullable().optional(),
+  unit: z.string().optional(),
+  confidence: z.number(),
+  details: z.union([z.string(), z.record(z.unknown())]).nullable().optional(),
+});
+export type AdviceItem = z.infer<typeof adviceItemSchema>;
+
+export const latestRecommendationsSchema = z.object({
+  field: idSchema.optional(),
+  generated_at: z.string().nullable().optional(),
+  items: z.array(adviceItemSchema).optional(),
+});
+export type LatestRecommendations = z.infer<typeof latestRecommendationsSchema>;
 
 /* ---------- diseases ---------- */
 export const diseaseReportSchema = z.object({

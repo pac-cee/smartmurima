@@ -1,131 +1,31 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
-import type { ColumnDef } from '@tanstack/react-table';
-import { RefreshCw } from 'lucide-react';
-import { toast } from 'sonner';
-import { DataTable } from '@/components/DataTable';
-import { PageHeader } from '@/components/PageHeader';
-import { TableSkeleton } from '@/components/Skeletons';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useAdminNodes, useAdminUsers, useKnowledgeDocs } from '@/hooks/useAdmin';
-import type { KnowledgeDoc, SensorNode, User } from '@/lib/schemas';
-import { formatDate, relativeTime } from '@/lib/utils';
+import { useEffect } from 'react';
+import { Loader2 } from 'lucide-react';
 
-const userColumns: ColumnDef<User>[] = [
-  { accessorKey: 'full_name', header: 'Name' },
-  { accessorKey: 'email', header: 'Email' },
-  {
-    accessorKey: 'role',
-    header: 'Role',
-    cell: ({ row }) => <Badge variant="soft">{row.original.role}</Badge>,
-  },
-  { accessorKey: 'phone_number', header: 'Phone' },
-  {
-    accessorKey: 'is_active',
-    header: 'Status',
-    cell: ({ row }) => (
-      <Badge variant={row.original.is_active ? 'soft' : 'muted'}>
-        {row.original.is_active ? 'Active' : 'Inactive'}
-      </Badge>
-    ),
-  },
-];
+// Administration lives in the Django admin, not this farmer-facing app. This
+// route only exists to redirect anyone who still has the old link bookmarked.
+const DJANGO_ADMIN_URL =
+  process.env.NEXT_PUBLIC_DJANGO_ADMIN_URL ?? 'http://localhost:8000/admin';
 
-const nodeColumns: ColumnDef<SensorNode>[] = [
-  { accessorKey: 'device_id', header: 'Device' },
-  { accessorKey: 'field_name', header: 'Field' },
-  {
-    accessorKey: 'status',
-    header: 'Status',
-    cell: ({ row }) => (
-      <Badge variant={row.original.status === 'active' ? 'soft' : 'muted'}>
-        {row.original.status}
-      </Badge>
-    ),
-  },
-  {
-    accessorKey: 'battery',
-    header: 'Battery',
-    cell: ({ row }) => <span className="tabular">{row.original.battery}%</span>,
-  },
-  {
-    accessorKey: 'last_seen',
-    header: 'Last seen',
-    cell: ({ row }) =>
-      row.original.last_seen ? relativeTime(row.original.last_seen) : '—',
-  },
-];
-
-export default function AdminPage() {
-  const t = useTranslations('admin');
-  const { data: users, isLoading: usersLoading } = useAdminUsers();
-  const { data: nodes, isLoading: nodesLoading } = useAdminNodes();
-  const { data: docs, isLoading: docsLoading } = useKnowledgeDocs();
-
-  const docColumns: ColumnDef<KnowledgeDoc>[] = [
-    { accessorKey: 'title', header: 'Title' },
-    {
-      accessorKey: 'category',
-      header: 'Category',
-      cell: ({ row }) => <Badge variant="outline">{row.original.category}</Badge>,
-    },
-    {
-      accessorKey: 'language',
-      header: 'Language',
-      cell: ({ row }) => row.original.language.toUpperCase(),
-    },
-    {
-      accessorKey: 'chunks',
-      header: 'Chunks',
-      cell: ({ row }) => <span className="tabular">{row.original.chunks}</span>,
-    },
-    {
-      accessorKey: 'embedded',
-      header: 'Status',
-      cell: ({ row }) =>
-        row.original.embedded ? (
-          <Badge variant="soft">Embedded</Badge>
-        ) : (
-          <Button
-            variant="subtle"
-            size="sm"
-            onClick={() => toast.success(`Re-embedding ${row.original.title}`)}
-          >
-            <RefreshCw className="size-3.5" /> {t('reembed')}
-          </Button>
-        ),
-    },
-    {
-      accessorKey: 'updated_at',
-      header: 'Updated',
-      cell: ({ row }) => formatDate(row.original.updated_at),
-    },
-  ];
+export default function AdminRedirectPage() {
+  useEffect(() => {
+    window.location.assign(DJANGO_ADMIN_URL);
+  }, []);
 
   return (
-    <div>
-      <PageHeader title={t('title')} subtitle={t('subtitle')} />
-
-      <Tabs defaultValue="users">
-        <TabsList>
-          <TabsTrigger value="users">{t('tabs.users')}</TabsTrigger>
-          <TabsTrigger value="nodes">{t('tabs.nodes')}</TabsTrigger>
-          <TabsTrigger value="documents">{t('tabs.documents')}</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="users">
-          {usersLoading ? <TableSkeleton /> : <DataTable columns={userColumns} data={users ?? []} />}
-        </TabsContent>
-        <TabsContent value="nodes">
-          {nodesLoading ? <TableSkeleton /> : <DataTable columns={nodeColumns} data={nodes ?? []} />}
-        </TabsContent>
-        <TabsContent value="documents">
-          {docsLoading ? <TableSkeleton /> : <DataTable columns={docColumns} data={docs ?? []} />}
-        </TabsContent>
-      </Tabs>
+    <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
+      <Loader2 className="size-6 animate-spin text-green-600" />
+      <div>
+        <p className="text-base font-semibold text-ink-900">Redirecting to the admin console…</p>
+        <p className="mt-1 text-sm text-ink-500">
+          If nothing happens,{' '}
+          <a href={DJANGO_ADMIN_URL} className="font-medium text-green-700 hover:underline">
+            open it here
+          </a>
+          .
+        </p>
+      </div>
     </div>
   );
 }

@@ -11,6 +11,9 @@ export const metadata: Metadata = {
   description:
     'AI-driven precision agriculture for smallholder farmers and cooperatives in Bugesera, Rwanda.',
   applicationName: 'SmartMurima',
+  // Stop Chrome/Google Translate from rewriting text nodes, which mutates the
+  // DOM out from under React and throws "Failed to execute 'insertBefore'".
+  other: { google: 'notranslate' },
 };
 
 export const viewport: Viewport = {
@@ -24,8 +27,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const messages = await getMessages();
 
   return (
-    <html lang={locale} suppressHydrationWarning>
-      <body className="min-h-screen bg-paper font-sans text-ink-900 antialiased">
+    <html lang={locale} translate="no" suppressHydrationWarning>
+      <body className="min-h-screen bg-paper font-sans text-ink-900 antialiased" suppressHydrationWarning>
         <Providers locale={locale} messages={messages}>
           {children}
         </Providers>

@@ -34,6 +34,9 @@ class SensorQueryService(BaseService):
 
     def query(self, user, field_id=None, node_id=None, date_from=None, date_to=None,
               agg: Optional[str] = None):
+        # Ignore non-numeric ids (e.g. a stale mock "f1") instead of 500-ing.
+        field_id = int(field_id) if field_id and str(field_id).isdigit() else None
+        node_id = int(node_id) if node_id and str(node_id).isdigit() else None
         qs = self.repo.query(user, field_id, node_id, date_from, date_to)
         if agg in ("hourly", "daily"):
             return self._aggregate(qs, agg)
@@ -65,7 +68,9 @@ class SensorQueryService(BaseService):
         ]
 
     def latest_for_field(self, user, field_id):
-        reading = self.repo.latest_for_field(field_id)
+        if not (field_id and str(field_id).isdigit()):
+            return None
+        reading = self.repo.latest_for_field(int(field_id))
         return reading
 
 

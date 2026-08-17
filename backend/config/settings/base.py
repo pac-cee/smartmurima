@@ -50,6 +50,8 @@ ALLOWED_HOSTS = env("DJANGO_ALLOWED_HOSTS")
 # Applications
 # ---------------------------------------------------------------------------
 DJANGO_APPS = [
+    # jazzmin must be listed before django.contrib.admin so its templates win.
+    "jazzmin",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -66,6 +68,7 @@ THIRD_PARTY_APPS = [
 ]
 
 LOCAL_APPS = [
+    "apps.locations",
     "apps.accounts",
     "apps.farms",
     "apps.sensors",
@@ -82,6 +85,9 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    # Serves collected static files (admin/jazzmin assets) directly from
+    # gunicorn, so the admin console has CSS/JS even with DEBUG=False.
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -192,6 +198,90 @@ SPECTACULAR_SETTINGS = {
     "SERVE_INCLUDE_SCHEMA": False,
     "SCHEMA_PATH_PREFIX": "/api/v1",
     "COMPONENT_SPLIT_REQUEST": True,
+}
+
+# ---------------------------------------------------------------------------
+# Admin theme (django-jazzmin)
+# ---------------------------------------------------------------------------
+JAZZMIN_SETTINGS = {
+    # Branding
+    "site_title": "SmartMurima Admin",
+    "site_header": "SmartMurima",
+    "site_brand": "SmartMurima",
+    "welcome_sign": "SmartMurima Administration",
+    "copyright": "SmartMurima",
+    # Search bar targets the most-used models.
+    "search_model": ["accounts.User", "farms.Farm"],
+    # Top navigation menu links.
+    "topmenu_links": [
+        {"name": "API Docs", "url": "/api/docs", "new_window": True},
+        {"name": "Farmer App", "url": "http://localhost:3000", "new_window": True},
+    ],
+    # App + model ordering in the sidebar.
+    "order_with_respect_to": [
+        "accounts",
+        "locations",
+        "farms",
+        "sensors",
+        "recommendations",
+        "diseases",
+        "alerts",
+        "weather",
+        "assistant",
+    ],
+    # FontAwesome icons per model.
+    "icons": {
+        "auth": "fas fa-users-cog",
+        "auth.Group": "fas fa-users",
+        "accounts.User": "fas fa-user",
+        "accounts.Farmer": "fas fa-tractor",
+        "locations.Location": "fas fa-map-marker-alt",
+        "farms.Farm": "fas fa-seedling",
+        "farms.Field": "fas fa-layer-group",
+        "farms.Section": "fas fa-layer-group",
+        "farms.Crop": "fas fa-wheat-awn",
+        "farms.SensorNode": "fas fa-microchip",
+        "sensors.SensorReading": "fas fa-wave-square",
+        "recommendations.Recommendation": "fas fa-lightbulb",
+        "diseases.DiseaseReport": "fas fa-bug",
+        "alerts.Alert": "fas fa-bell",
+        "weather.WeatherRecord": "fas fa-cloud-sun",
+        "assistant.KnowledgeDocument": "fas fa-book",
+    },
+    "default_icon_parents": "fas fa-chevron-circle-right",
+    "default_icon_children": "fas fa-circle",
+    # Open related record edits in a modal instead of a full page.
+    "related_modal_active": True,
+    # Hide the live UI builder in the production console.
+    "show_ui_builder": False,
+}
+
+JAZZMIN_UI_TWEAKS = {
+    "theme": "flatly",
+    "dark_mode_theme": None,
+    "navbar": "navbar-success navbar-dark",
+    "navbar_small_text": False,
+    "no_navbar_border": False,
+    "navbar_fixed": True,
+    "sidebar": "sidebar-dark-success",
+    "sidebar_fixed": True,
+    "sidebar_nav_small_text": False,
+    "sidebar_nav_flat_style": False,
+    "brand_colour": "navbar-success",
+    "brand_small_text": False,
+    "accent": "accent-success",
+    "body_small_text": False,
+    "footer_fixed": False,
+    "actions_sticky_top": True,
+    # Rounded, non-flat buttons for a softer, branded feel.
+    "button_classes": {
+        "primary": "btn-success",
+        "secondary": "btn-secondary",
+        "info": "btn-info",
+        "warning": "btn-warning",
+        "danger": "btn-danger",
+        "success": "btn-success",
+    },
 }
 
 # ---------------------------------------------------------------------------

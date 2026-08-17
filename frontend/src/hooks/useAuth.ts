@@ -9,6 +9,7 @@ import {
   otpChallengeSchema,
   userSchema,
   type AuthResult,
+  type ChangePasswordInput,
   type LoginInput,
   type OtpChallenge,
   type OtpVerifyInput,
@@ -50,6 +51,10 @@ export function useLogin() {
   });
 }
 
+// Registration uses OTP. `POST /auth/register` returns an OTP "challenge"
+// ({ identifier, purpose, expires_at, dev_code? }) and does NOT return tokens,
+// so no session is stored here. The page routes to /verify-otp, where the user
+// enters the code and `useVerifyOtp` establishes the session.
 export function useRegister() {
   return useMutation<OtpChallenge, Error, RegisterInput>({
     mutationFn: (input) => api.post('/auth/register', input, otpChallengeSchema, { auth: false }),
@@ -110,6 +115,12 @@ export function useUpdateProfile() {
       tokenStore.setUser(user);
       void qc.invalidateQueries({ queryKey: ['me'] });
     },
+  });
+}
+
+export function useChangePassword() {
+  return useMutation<unknown, Error, ChangePasswordInput>({
+    mutationFn: (input) => api.post('/auth/password/change', input),
   });
 }
 

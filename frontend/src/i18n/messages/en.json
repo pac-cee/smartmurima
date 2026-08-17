@@ -6,7 +6,7 @@
   "nav": {
     "dashboard": "Dashboard",
     "farms": "Farms",
-    "fields": "Fields",
+    "fields": "Sections",
     "recommendations": "Advice",
     "diseases": "Crop health",
     "assistant": "Assistant",
@@ -14,7 +14,41 @@
     "reports": "Reports",
     "admin": "Admin",
     "settings": "Settings",
-    "sections": { "overview": "Overview", "grow": "Grow", "manage": "Manage" }
+    "sections": {
+      "overview": "Overview",
+      "grow": "Grow",
+      "manage": "Manage"
+    },
+    "sensors": "IoT"
+  },
+  "sections": {
+    "section": "Section",
+    "sections": "Sections",
+    "noSection": "Select or add a section to continue.",
+    "selectPrompt": "Select a section from the top bar",
+    "selectPromptBody": "Use the Farm / Section switcher at the top of the page to choose a section to view here."
+  },
+  "switcher": {
+    "farm": "Farm",
+    "section": "Section"
+  },
+  "onboarding": {
+    "farmTitle": "Create your first farm",
+    "farmBody": "Add your farm to start tracking soil moisture, weather, and crop health.",
+    "farmCta": "Create your first farm",
+    "sectionTitle": "Add your first section",
+    "sectionBody": "A section is a plot planted with one crop. Add one to unlock live readings and advice.",
+    "sectionCta": "Add your first section"
+  },
+  "location": {
+    "label": "Location",
+    "current": "Current",
+    "province": "Province",
+    "district": "District",
+    "sector": "Sector",
+    "selectProvince": "Select province",
+    "selectDistrict": "Select district",
+    "selectSector": "Select sector"
   },
   "common": {
     "loading": "Loading",
@@ -49,9 +83,9 @@
   "empty": {
     "farms": "No farms yet",
     "farmsBody": "Add your first farm to start tracking soil, weather, and crop health.",
-    "fields": "No fields in this farm",
+    "fields": "No sections in this farm",
     "recommendations": "No advice yet",
-    "recommendationsBody": "Request irrigation, fertilizer, or yield advice for a field.",
+    "recommendationsBody": "Advice on irrigation, fertilizer, and yield is generated automatically for each section.",
     "diseases": "No crop scans yet",
     "diseasesBody": "Upload a leaf photo to check for disease.",
     "alerts": "You're all caught up",
@@ -113,7 +147,11 @@
     "askBody": "Get instant guidance in Kinyarwanda or English.",
     "openAssistant": "Open assistant"
   },
-  "range": { "24h": "24h", "7d": "7 days", "30d": "30 days" },
+  "range": {
+    "24h": "24h",
+    "7d": "7 days",
+    "30d": "30 days"
+  },
   "sensors": {
     "soil_moisture": "Soil moisture",
     "temperature": "Temperature",
@@ -124,11 +162,36 @@
     "online": "Online",
     "offline": "Offline",
     "history": "Reading history",
-    "nodes": "Sensor nodes"
+    "nodes": "Sensor nodes",
+    "title": "Sensors & IoT",
+    "subtitle": "Live telemetry and sensor node management, per section.",
+    "selectField": "Section",
+    "latest": "Latest readings",
+    "liveGauges": "Live gauges",
+    "noFarm": "Add a farm to start receiving sensor readings.",
+    "noField": "Select or add a section to view its sensors.",
+    "noReadings": "No readings yet",
+    "noReadingsBody": "Add a sensor node to this section to start receiving live telemetry.",
+    "noNodes": "No sensor nodes are registered on this section yet.",
+    "addNode": "Add node",
+    "editNode": "Edit node",
+    "removeNode": "Remove node",
+    "removeConfirm": "Remove node “{device}”? This cannot be undone.",
+    "deviceId": "Device ID",
+    "deviceIdRequired": "Enter a device ID.",
+    "status": "Status",
+    "statuses": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "maintenance": "Maintenance"
+    },
+    "nodeAdded": "Node added",
+    "nodeRemoved": "Node removed",
+    "nodeBelongs": "This node belongs to the selected section of your farm."
   },
   "farms": {
     "title": "Farms",
-    "subtitle": "Your registered farms and their fields.",
+    "subtitle": "Your registered farms and their sections.",
     "add": "Add farm",
     "newFarm": "New farm",
     "name": "Farm name",
@@ -136,31 +199,57 @@
     "area": "Area (hectares)",
     "latitude": "Latitude",
     "longitude": "Longitude",
-    "fields": "Fields",
+    "fields": "Sections",
     "nodes": "Nodes",
     "location": "Location",
     "fieldsCount": "{count} fields",
-    "created": "Farm created"
+    "created": "Farm created",
+    "editFarm": "Edit farm",
+    "deleteFarm": "Delete farm",
+    "deleteConfirm": "Delete “{name}”? This also removes its fields and cannot be undone.",
+    "deleted": "Farm deleted"
   },
   "fields": {
-    "title": "Field",
+    "title": "Section",
     "crop": "Crop",
     "growthStage": "Growth stage",
     "plantingDate": "Planting date",
-    "add": "Add field",
-    "newField": "New field",
+    "add": "Add section",
+    "newField": "New section",
     "gauges": "Live conditions",
-    "reports": "Crop scans"
+    "reports": "Crop scans",
+    "deleteField": "Delete section",
+    "deleteConfirm": "Delete “{name}”? This cannot be undone.",
+    "deleted": "Section deleted",
+    "added": "Section added",
+    "selectCrop": "Choose a crop",
+    "firstSectionTitle": "Add your first section",
+    "firstSectionBody": "A section is a plot planted with one crop. Add one to start tracking it.",
+    "stages": {
+      "germination": "Germination",
+      "vegetative": "Vegetative",
+      "flowering": "Flowering",
+      "maturity": "Maturity",
+      "harvest": "Harvest"
+    },
+    "cropPlaceholder": "e.g. Maize, Beans, Tomato"
   },
   "recommendations": {
     "title": "Advice",
-    "subtitle": "AI guidance on irrigation, fertilizer, and yield.",
-    "request": "Request advice",
-    "types": { "irrigation": "Irrigation", "fertilizer": "Fertilizer", "yield": "Yield" },
+    "subtitle": "Automatic guidance on irrigation, fertilizer, and yield for each section.",
+    "types": {
+      "irrigation": "Irrigation",
+      "fertilizer": "Fertilizer",
+      "yield": "Yield"
+    },
     "decision": "Decision",
     "details": "Why this advice",
-    "runFor": "Get advice for",
-    "history": "Advice history"
+    "refresh": "Refresh",
+    "generatedAt": "Generated",
+    "selectSection": "Select a section to see its advice.",
+    "noAdvice": "No advice yet",
+    "noAdviceBody": "Advice appears automatically once this section has sensor readings.",
+    "noFarm": "Add a farm and a section to receive advice."
   },
   "diseases": {
     "title": "Crop health",
@@ -183,6 +272,7 @@
     "sources": "Sources",
     "thinking": "Thinking…",
     "newChat": "New chat",
+    "sendFailed": "Couldn't reach the assistant. Please try again.",
     "suggestions": {
       "s1": "When should I irrigate my beans?",
       "s2": "How do I treat maize leaf blight?",
@@ -193,6 +283,7 @@
     "title": "Alerts",
     "subtitle": "Notifications about your fields.",
     "markRead": "Mark as read",
+    "markAllRead": "Mark all as read",
     "unread": "Unread",
     "types": {
       "low_moisture": "Low soil moisture",
@@ -209,12 +300,19 @@
     "exportCsv": "Export CSV",
     "from": "From",
     "to": "To",
-    "summary": "Summary"
+    "summary": "Summary",
+    "selectFarm": "Select a farm to view reports",
+    "selectFarmBody": "Choose a farm from the switcher to see its season summary and exports.",
+    "exportFailed": "Export failed. Please try again."
   },
   "admin": {
     "title": "Admin",
     "subtitle": "Manage users, sensor nodes, and knowledge documents.",
-    "tabs": { "users": "Users", "nodes": "Sensor nodes", "documents": "Knowledge base" },
+    "tabs": {
+      "users": "Users",
+      "nodes": "Sensor nodes",
+      "documents": "Knowledge base"
+    },
     "reembed": "Re-embed",
     "addUser": "Add user",
     "addDocument": "Add document"
@@ -230,7 +328,12 @@
     "themeDark": "Dark",
     "themeSystem": "System",
     "changePassword": "Change password",
-    "currentPassword": "Current password"
+    "currentPassword": "Current password",
+    "confirmPassword": "Confirm new password",
+    "passwordChanged": "Password updated",
+    "passwordMismatch": "New passwords do not match.",
+    "passwordTooShort": "New password must be at least 8 characters.",
+    "passwordError": "Could not change your password."
   },
   "weather": {
     "title": "Weather",

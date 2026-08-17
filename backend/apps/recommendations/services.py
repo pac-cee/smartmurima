@@ -22,6 +22,7 @@ from .repositories import RecommendationRepository
 
 IRRIGATION_ALERT_THRESHOLD = 0.7  # confidence above which a critical need alerts
 STALENESS_HOURS = 48  # BR-R2: flag recommendations built on data older than this
+FRESHNESS_HOURS = 6  # /latest regenerates advice older than this (or on new data)
 
 
 class RecommendationService(BaseService):
@@ -64,15 +65,20 @@ class RecommendationService(BaseService):
         since = now - timedelta(days=7)
         readings = list(self.reading_repo.recent_for_field(field.id, since))
         base_temp = float(field.crop.base_temp) if field.crop else 10.0
+        crop_name = field.crop.name if field.crop else None
         features = FeatureBuilder.build(
             readings,
             now=now,
             base_temp=base_temp,
             planting_date=field.planting_date,
-            crop_name=field.crop.name if field.crop else None,
+            crop_name=crop_name,
             growth_stage=getattr(field, "growth_stage", None),
             soil_class=None,  # farms model has no soil class yet; encoder defaults
         )
+        # Crop + location/region context so recommendations are situated in the
+        # farm's real setting (merged into each prediction's details/rationale).
+        features.extras["crop"] = crop_name
+        features.extras["region"] = self._region_for(field)
         # Data-freshness provenance (UC-14 E1 / BR-R2): flag stale or missing data
         # so downstream never issues a confident recommendation on old readings.
         latest = self.reading_repo.latest_for_field(field.id)
@@ -87,6 +93,17 @@ class RecommendationService(BaseService):
         return features
 
     @staticmethod
+    def _region_for(field):
+        """Human-readable region context for a field, preferring the farm's
+        linked Location path, then its free-text sector."""
+        farm = field.farm
+        loc = getattr(farm, "location", None)
+        if loc is not None:
+            return loc.full_path
+        sector = getattr(farm, "sector", "")
+        return sector or None
+
+    @staticmethod
     def _apply_provenance(pred, features):
         """Merge data-freshness provenance into a prediction's details and, when
         data is stale/missing, damp the reported confidence (BR-R1/BR-R2)."""
@@ -94,6 +111,12 @@ class RecommendationService(BaseService):
         pred.details["data_status"] = status
         if "reading_age_hours" in features.extras:
             pred.details["reading_age_hours"] = features.extras["reading_age_hours"]
+        # Situate the advice in its crop + location context (do not clobber a
+        # crop label a model may already have set).
+        for key in ("crop", "region"):
+            value = features.extras.get(key)
+            if value and not pred.details.get(key):
+                pred.details[key] = value
         if status in ("stale", "missing"):
             pred.details["confidence_note"] = (
                 "Confidence reduced: readings stale or missing."
@@ -101,9 +124,78 @@ class RecommendationService(BaseService):
             pred.confidence = round(pred.confidence * 0.7, 2)
         return pred
 
-    # -- public API -------------------------------------------------------
+    # -- public API (ownership-checked entrypoints) -----------------------
     def irrigation(self, user, field_id):
+        return self._run_irrigation(self._get_field(user, field_id))
+
+    def fertilizer(self, user, field_id):
+        return self._run_fertilizer(self._get_field(user, field_id))
+
+    def yield_estimate(self, user, field_id):
+        return self._run_yield(self._get_field(user, field_id))
+
+    def generate_for_field(self, field) -> dict:
+        """Generate + persist all three recommendation types for a resolved
+        field. Internal: performs NO ownership check (callers must gate)."""
+        return {
+            RecommendationType.IRRIGATION: self._run_irrigation(field),
+            RecommendationType.FERTILIZER: self._run_fertilizer(field),
+            RecommendationType.YIELD: self._run_yield(field),
+        }
+
+    def latest(self, user, field_id) -> dict:
+        """Return the current advice bundle for a field, regenerating fresh
+        recommendations when none exist, the newest is stale (> freshness
+        window), or newer sensor data has arrived since they were built."""
         field = self._get_field(user, field_id)
+        recs = self.repo.newest_for_field_by_type(field.id)
+        if self._needs_refresh(field, recs):
+            recs = self.generate_for_field(field)
+
+        order = (
+            RecommendationType.IRRIGATION,
+            RecommendationType.FERTILIZER,
+            RecommendationType.YIELD,
+        )
+        items = [self._to_item(recs[t]) for t in order if recs.get(t)]
+        generated_at = max(
+            (recs[t].created_at for t in recs), default=timezone.now()
+        )
+        return {
+            "field": field.id,
+            "generated_at": generated_at.isoformat(),
+            "items": items,
+        }
+
+    def _needs_refresh(self, field, recs: dict) -> bool:
+        required = {
+            RecommendationType.IRRIGATION,
+            RecommendationType.FERTILIZER,
+            RecommendationType.YIELD,
+        }
+        if not required.issubset(recs.keys()):
+            return True
+        oldest = min(recs[t].created_at for t in required)
+        if (timezone.now() - oldest).total_seconds() > FRESHNESS_HOURS * 3600:
+            return True
+        latest_reading = self.reading_repo.latest_for_field(field.id)
+        if latest_reading is not None and latest_reading.recorded_at > oldest:
+            return True
+        return False
+
+    @staticmethod
+    def _to_item(rec) -> dict:
+        return {
+            "type": rec.type,
+            "decision": rec.decision,
+            "value": rec.value,
+            "unit": rec.unit,
+            "confidence": rec.confidence,
+            "details": rec.details,
+        }
+
+    # -- internal generators (field already resolved) ---------------------
+    def _run_irrigation(self, field):
         features = self._build_features(field)
         model = self._irrigation_model or IrrigationClassifier()
         pred = self._apply_provenance(model.predict(features), features)
@@ -120,8 +212,7 @@ class RecommendationService(BaseService):
             self._maybe_alert_low_moisture(field, features)
         return rec
 
-    def fertilizer(self, user, field_id):
-        field = self._get_field(user, field_id)
+    def _run_fertilizer(self, field):
         features = self._build_features(field)
         crop_name = field.crop.name if field.crop else ""
         model = self._fertilizer_model or FertilizerRecommender()
@@ -138,8 +229,7 @@ class RecommendationService(BaseService):
             details=pred.details,
         )
 
-    def yield_estimate(self, user, field_id):
-        field = self._get_field(user, field_id)
+    def _run_yield(self, field):
         features = self._build_features(field)
         crop_name = field.crop.name if field.crop else ""
         model = self._yield_model or YieldRegressor()

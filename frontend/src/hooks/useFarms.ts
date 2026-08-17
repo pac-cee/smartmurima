@@ -28,6 +28,17 @@ export function useCreateFarm() {
   });
 }
 
+export function useUpdateFarm() {
+  const qc = useQueryClient();
+  return useMutation<Farm, Error, { id: string; input: Partial<FarmInput> }>({
+    mutationFn: ({ id, input }) => api.patch(`/farms/${id}`, input, farmSchema),
+    onSuccess: (_data, { id }) => {
+      void qc.invalidateQueries({ queryKey: ['farms'] });
+      void qc.invalidateQueries({ queryKey: ['farms', id] });
+    },
+  });
+}
+
 export function useDeleteFarm() {
   const qc = useQueryClient();
   return useMutation<void, Error, string>({

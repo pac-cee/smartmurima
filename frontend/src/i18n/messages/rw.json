@@ -6,7 +6,7 @@
   "nav": {
     "dashboard": "Imbonerahamwe",
     "farms": "Imirima",
-    "fields": "Ibibanza",
+    "fields": "Ibice",
     "recommendations": "Inama",
     "diseases": "Ubuzima bw' igihingwa",
     "assistant": "Umufasha",
@@ -14,7 +14,41 @@
     "reports": "Raporo",
     "admin": "Ubuyobozi",
     "settings": "Igenamiterere",
-    "sections": { "overview": "Incamake", "grow": "Guhinga", "manage": "Gucunga" }
+    "sections": {
+      "overview": "Incamake",
+      "grow": "Guhinga",
+      "manage": "Gucunga"
+    },
+    "sensors": "IoT"
+  },
+  "sections": {
+    "section": "Igice",
+    "sections": "Ibice",
+    "noSection": "Hitamo cyangwa wongereho igice kugira ngo ukomeze.",
+    "selectPrompt": "Hitamo igice mu kagaragazo ko hejuru",
+    "selectPromptBody": "Koresha agahitamo k'Umurima / Igice kaguru ku ipaji kugira ngo uhitemo igice cyo kureba hano."
+  },
+  "switcher": {
+    "farm": "Umurima",
+    "section": "Igice"
+  },
+  "onboarding": {
+    "farmTitle": "Fungura umurima wawe wa mbere",
+    "farmBody": "Ongeraho umurima wawe kugira ngo utangire gukurikirana ubwuzu bw'ubutaka, ikirere n'ubuzima bw'ibihingwa.",
+    "farmCta": "Fungura umurima wawe wa mbere",
+    "sectionTitle": "Ongeraho igice cyawe cya mbere",
+    "sectionBody": "Igice ni ikibanza gifite igihingwa kimwe. Ongeraho kimwe kugira ngo ubone ibipimo bizima n'inama.",
+    "sectionCta": "Ongeraho igice cyawe cya mbere"
+  },
+  "location": {
+    "label": "Aho iherereye",
+    "current": "Ubu",
+    "province": "Intara",
+    "district": "Akarere",
+    "sector": "Umurenge",
+    "selectProvince": "Hitamo intara",
+    "selectDistrict": "Hitamo akarere",
+    "selectSector": "Hitamo umurenge"
   },
   "common": {
     "loading": "Biratunganywa",
@@ -49,9 +83,9 @@
   "empty": {
     "farms": "Nta murima urahari",
     "farmsBody": "Ongeraho umurima wawe wa mbere kugira ngo utangire gukurikirana ubutaka, ikirere n'ubuzima bw'ibihingwa.",
-    "fields": "Nta bibanza biri muri uyu murima",
+    "fields": "Nta bice biri muri uyu murima",
     "recommendations": "Nta nama irahari",
-    "recommendationsBody": "Saba inama ku kuhira, ifumbire cyangwa umusaruro w'ikibanza.",
+    "recommendationsBody": "Inama ku kuhira, ifumbire n'umusaruro zitangwa mu buryo bwikora kuri buri gice.",
     "diseases": "Nta gusuzuma birakorwa",
     "diseasesBody": "Ohereza ifoto y'ikibabi kugira ngo usuzume indwara.",
     "alerts": "Nta menyesha rishya",
@@ -113,7 +147,11 @@
     "askBody": "Bona ubuyobozi bwihuse mu Kinyarwanda cyangwa Icyongereza.",
     "openAssistant": "Fungura umufasha"
   },
-  "range": { "24h": "amasaha 24", "7d": "iminsi 7", "30d": "iminsi 30" },
+  "range": {
+    "24h": "amasaha 24",
+    "7d": "iminsi 7",
+    "30d": "iminsi 30"
+  },
   "sensors": {
     "soil_moisture": "Ubwuzu bw'ubutaka",
     "temperature": "Ubushyuhe",
@@ -124,11 +162,36 @@
     "online": "Irakora",
     "offline": "Ntikora",
     "history": "Amateka y'ibipimo",
-    "nodes": "Ibyuma bipima"
+    "nodes": "Ibyuma bipima",
+    "title": "Sensoro & IoT",
+    "subtitle": "Ibipimo bizima no gucunga ibyuma bipima, kuri buri gice.",
+    "selectField": "Igice",
+    "latest": "Ibipimo bya vuba",
+    "liveGauges": "Ibipimo bizima",
+    "noFarm": "Ongeraho umurima kugira ngo utangire kubona ibipimo bya sensoro.",
+    "noField": "Hitamo cyangwa wongereho igice kugira ngo urebe sensoro zawo.",
+    "noReadings": "Nta bipimo birahari",
+    "noReadingsBody": "Ongeraho igikoresho cya sensoro kuri iki gice kugira ngo utangire kubona ibipimo bizima.",
+    "noNodes": "Nta sensoro zanditswe kuri iki gice.",
+    "addNode": "Ongeraho igikoresho",
+    "editNode": "Hindura igikoresho",
+    "removeNode": "Kuraho igikoresho",
+    "removeConfirm": "Kuraho igikoresho “{device}”? Ntibisubirwaho.",
+    "deviceId": "Nomero y'igikoresho",
+    "deviceIdRequired": "Andika nomero y'igikoresho.",
+    "status": "Imiterere",
+    "statuses": {
+      "active": "Irakora",
+      "inactive": "Ntikora",
+      "maintenance": "Isanwa"
+    },
+    "nodeAdded": "Igikoresho cyongewemo",
+    "nodeRemoved": "Igikoresho cyakuweho",
+    "nodeBelongs": "Iki gikoresho kiri mu gice cyatoranyijwe cy'umurima wawe."
   },
   "farms": {
     "title": "Imirima",
-    "subtitle": "Imirima yawe yanditse n'ibibanza byayo.",
+    "subtitle": "Imirima yawe yanditse n'ibice byayo.",
     "add": "Ongeraho umurima",
     "newFarm": "Umurima mushya",
     "name": "Izina ry'umurima",
@@ -136,31 +199,57 @@
     "area": "Ubuso (hegitari)",
     "latitude": "Latitude",
     "longitude": "Longitude",
-    "fields": "Ibibanza",
+    "fields": "Ibice",
     "nodes": "Ibyuma",
     "location": "Aho iherereye",
     "fieldsCount": "ibibanza {count}",
-    "created": "Umurima warakozwe"
+    "created": "Umurima warakozwe",
+    "editFarm": "Hindura umurima",
+    "deleteFarm": "Siba umurima",
+    "deleteConfirm": "Siba “{name}”? Ibi bisiba n'ibibanza byawo kandi ntibisubirwaho.",
+    "deleted": "Umurima wasibwe"
   },
   "fields": {
-    "title": "Ikibanza",
+    "title": "Igice",
     "crop": "Igihingwa",
     "growthStage": "Icyiciro cy'imikurire",
     "plantingDate": "Itariki yo gutera",
-    "add": "Ongeraho ikibanza",
-    "newField": "Ikibanza gishya",
+    "add": "Ongeraho igice",
+    "newField": "Igice gishya",
     "gauges": "Imimerere iriho",
-    "reports": "Gusuzuma"
+    "reports": "Gusuzuma",
+    "deleteField": "Siba igice",
+    "deleteConfirm": "Siba “{name}”? Ntibisubirwaho.",
+    "deleted": "Igice cyasibwe",
+    "added": "Igice cyongewemo",
+    "selectCrop": "Hitamo igihingwa",
+    "firstSectionTitle": "Ongeraho igice cyawe cya mbere",
+    "firstSectionBody": "Igice ni ikibanza gifite igihingwa kimwe. Ongeraho kimwe kugira ngo utangire kugikurikirana.",
+    "stages": {
+      "germination": "Kumera",
+      "vegetative": "Gukura",
+      "flowering": "Kurabya",
+      "maturity": "Gukura neza",
+      "harvest": "Gusarura"
+    },
+    "cropPlaceholder": "urugero: Ibigori, Ibishyimbo"
   },
   "recommendations": {
     "title": "Inama",
-    "subtitle": "Ubuyobozi bwa AI ku kuhira, ifumbire n'umusaruro.",
-    "request": "Saba inama",
-    "types": { "irrigation": "Kuhira", "fertilizer": "Ifumbire", "yield": "Umusaruro" },
+    "subtitle": "Ubuyobozi bwikora ku kuhira, ifumbire n'umusaruro kuri buri gice.",
+    "types": {
+      "irrigation": "Kuhira",
+      "fertilizer": "Ifumbire",
+      "yield": "Umusaruro"
+    },
     "decision": "Icyemezo",
     "details": "Impamvu y'iyi nama",
-    "runFor": "Bona inama kuri",
-    "history": "Amateka y'inama"
+    "refresh": "Ongera usubiremo",
+    "generatedAt": "Byakozwe",
+    "selectSection": "Hitamo igice kugira ngo ubone inama zacyo.",
+    "noAdvice": "Nta nama irahari",
+    "noAdviceBody": "Inama zigaragara mu buryo bwikora iyo iki gice gifite ibipimo bya sensoro.",
+    "noFarm": "Ongeraho umurima n'igice kugira ngo ubone inama."
   },
   "diseases": {
     "title": "Ubuzima bw'igihingwa",
@@ -183,6 +272,7 @@
     "sources": "Inkomoko",
     "thinking": "Aratekereza…",
     "newChat": "Ikiganiro gishya",
+    "sendFailed": "Ntitwabashije kugera ku mufasha. Ongera ugerageze.",
     "suggestions": {
       "s1": "Ni ryari nkuhira ibishyimbo byanjye?",
       "s2": "Nkora nte kugira ngo mvure indwara y'ibibabi by'ibigori?",
@@ -193,6 +283,7 @@
     "title": "Imenyesha",
     "subtitle": "Imenyesha rijyanye n'ibibanza byawe.",
     "markRead": "Menya ko wasomye",
+    "markAllRead": "Menya ko byose wasomye",
     "unread": "Ritarasomwa",
     "types": {
       "low_moisture": "Ubwuzu buke bw'ubutaka",
@@ -209,12 +300,19 @@
     "exportCsv": "Ohereza CSV",
     "from": "Kuva",
     "to": "Kugeza",
-    "summary": "Incamake"
+    "summary": "Incamake",
+    "selectFarm": "Hitamo umurima kugira ngo urebe raporo",
+    "selectFarmBody": "Hitamo umurima kugira ngo ubone incamake y'igihembwe no kohereza.",
+    "exportFailed": "Kohereza byanze. Ongera ugerageze."
   },
   "admin": {
     "title": "Ubuyobozi",
     "subtitle": "Gucunga abakoresha, ibyuma bipima n'inyandiko z'ubumenyi.",
-    "tabs": { "users": "Abakoresha", "nodes": "Ibyuma bipima", "documents": "Ububiko bw'ubumenyi" },
+    "tabs": {
+      "users": "Abakoresha",
+      "nodes": "Ibyuma bipima",
+      "documents": "Ububiko bw'ubumenyi"
+    },
     "reembed": "Ongera ubike",
     "addUser": "Ongeraho ukoresha",
     "addDocument": "Ongeraho inyandiko"
@@ -230,7 +328,12 @@
     "themeDark": "Umwijima",
     "themeSystem": "Sisitemu",
     "changePassword": "Hindura ijambobanga",
-    "currentPassword": "Ijambobanga rigezweho"
+    "currentPassword": "Ijambobanga rigezweho",
+    "confirmPassword": "Emeza ijambobanga rishya",
+    "passwordChanged": "Ijambobanga ryahinduwe",
+    "passwordMismatch": "Amagambobanga mashya ntahuye.",
+    "passwordTooShort": "Ijambobanga rishya rigomba kuba nibura inyuguti 8.",
+    "passwordError": "Ntitwabashije guhindura ijambobanga ryawe."
   },
   "weather": {
     "title": "Ikirere",

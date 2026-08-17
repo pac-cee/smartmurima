@@ -54,6 +54,28 @@ services:
     #     reservations:
     #       devices: [{ driver: nvidia, count: all, capabilities: [gpu] }]
 
+  # One-shot bootstrap: waits for Ollama, pulls the LLM + embedding models, exits.
+  # The main stack does NOT depend on this — the assistant degrades gracefully
+  # until the models finish downloading.
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: sm_ollama_init
+    restart: "no"
+    depends_on:
+      - ollama
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      LLM_MODEL: ${LLM_MODEL:-qwen2.5:0.5b}
+      EMBED_MODEL: ${EMBED_MODEL:-nomic-embed-text}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        echo "waiting for ollama at $${OLLAMA_HOST}...";
+        until ollama list >/dev/null 2>&1; do sleep 2; done;
+        echo "pulling $${LLM_MODEL}"; ollama pull "$${LLM_MODEL}";
+        echo "pulling $${EMBED_MODEL}"; ollama pull "$${EMBED_MODEL}";
+        echo "ollama model bootstrap complete"
+
   # MQTT broker for ESP32 IoT telemetry.
   mqtt:
     image: eclipse-mosquitto:2
@@ -82,6 +104,9 @@ services:
     command: >
       sh -c "python manage.py migrate &&
              python manage.py collectstatic --noinput &&
+             python manage.py create_default_admin &&
+             (python manage.py seed_locations || true) &&
+             (python manage.py seed_demo || true) &&
              gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 180"
 
   # MQTT->DB ingestion worker (same image as backend, different entrypoint).
@@ -117,6 +142,22 @@ services:
     depends_on:
       - backend
     command: sh -c "corepack enable && corepack prepare pnpm@9 --activate && pnpm install && pnpm dev -p 3000 -H 0.0.0.0"
+
+  # Virtual ESP32 telemetry publisher. Only runs when explicitly requested:
+  #   docker compose --profile iot up -d simulator
+  simulator:
+    build: ./iot/simulator
+    container_name: sm_simulator
+    restart: unless-stopped
+    profiles: ["iot"]
+    depends_on:
+      - mqtt
+      - backend
+    environment:
+      MQTT_HOST: ${MQTT_HOST:-mqtt}
+      MQTT_PORT: ${MQTT_PORT:-1883}
+      SIM_DEVICES: ${SIM_DEVICES:-SM-NODE-01,SM-NODE-02}
+      SIM_INTERVAL: ${SIM_INTERVAL:-10}
 
 volumes:
   db_data:

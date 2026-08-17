@@ -44,7 +44,11 @@ class FieldService(BaseService):
     def list_for_user(self, user, farm_id=None):
         qs = self.repo.list_for_user(user)
         if farm_id:
-            qs = qs.filter(farm_id=farm_id)
+            # A specific-but-invalid id (e.g. a stale mock "f1") must yield an
+            # empty result, never a 500 from int-casting a non-numeric id.
+            if not str(farm_id).isdigit():
+                return qs.none()
+            qs = qs.filter(farm_id=int(farm_id))
         return qs
 
     def create_for_user(self, user, data: dict):
@@ -78,6 +82,13 @@ class SensorNodeService(BaseService):
         return self.repo.list_for_user(user)
 
     def create(self, data: dict):
+        return self.repo.create(**data)
+
+    def create_for_user(self, user, data: dict):
+        field = data.get("field")
+        if field is None:
+            raise NotFoundError("Field is required.")
+        _ensure_access(user, field.farm.farmer)
         return self.repo.create(**data)
 
 
