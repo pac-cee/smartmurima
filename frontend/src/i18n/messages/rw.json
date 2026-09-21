@@ -48,7 +48,9 @@
     "sector": "Umurenge",
     "selectProvince": "Hitamo intara",
     "selectDistrict": "Hitamo akarere",
-    "selectSector": "Hitamo umurenge"
+    "selectSector": "Hitamo umurenge",
+    "noOptions": "Nta bisubizo bihari",
+    "loadFailed": "Ntibyashobotse gushaka aho iherereye"
   },
   "common": {
     "loading": "Biratunganywa",

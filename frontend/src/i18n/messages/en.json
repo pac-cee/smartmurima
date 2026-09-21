@@ -48,7 +48,9 @@
     "sector": "Sector",
     "selectProvince": "Select province",
     "selectDistrict": "Select district",
-    "selectSector": "Select sector"
+    "selectSector": "Select sector",
+    "noOptions": "No options available",
+    "loadFailed": "Could not load locations"
   },
   "common": {
     "loading": "Loading",
