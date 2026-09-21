@@ -23,7 +23,16 @@ env = environ.Env(
     OTP_RESEND_COOLDOWN_SECONDS=(int, 60),
     SMS_PROVIDER=(str, ""),
     SMS_API_KEY=(str, ""),
-    SMS_SENDER_ID=(str, "SmartMurima"),
+    SMS_SENDER_ID=(str, ""),
+    SMS_USERNAME=(str, ""),
+    SMS_API_URL=(str, ""),
+    EMAIL_HOST=(str, ""),
+    EMAIL_PORT=(int, 587),
+    EMAIL_HOST_USER=(str, ""),
+    EMAIL_HOST_PASSWORD=(str, ""),
+    EMAIL_USE_TLS=(bool, True),
+    EMAIL_USE_SSL=(bool, False),
+    DEFAULT_FROM_EMAIL=(str, "SmartMurima <no-reply@smartmurima.rw>"),
     MQTT_HOST=(str, "mqtt"),
     MQTT_PORT=(int, 1883),
     MQTT_TOPIC=(str, "smartmurima/+/telemetry"),
@@ -301,9 +310,37 @@ OTP_RESEND_COOLDOWN_SECONDS = env("OTP_RESEND_COOLDOWN_SECONDS")
 # ---------------------------------------------------------------------------
 # SMS gateway
 # ---------------------------------------------------------------------------
+# SMS_PROVIDER is a provider name ("africastalking") or a URL for the generic
+# HTTP gateway; blank means codes are printed to the console instead of sent.
+# SMS_USERNAME is the Africa's Talking username ("sandbox" for the simulator).
+# SMS_SENDER_ID must stay blank unless the account owns a registered sender ID,
+# which Africa's Talking rejects otherwise.
 SMS_PROVIDER = env("SMS_PROVIDER")
 SMS_API_KEY = env("SMS_API_KEY")
 SMS_SENDER_ID = env("SMS_SENDER_ID")
+SMS_USERNAME = env("SMS_USERNAME")
+SMS_API_URL = env("SMS_API_URL")
+
+# ---------------------------------------------------------------------------
+# Email (OTP codes to email identifiers)
+# ---------------------------------------------------------------------------
+# With no EMAIL_HOST configured, mail goes to the console backend: the code is
+# printed in the backend logs and echoed back to the client as `dev_code`, so
+# local development needs no mail server. Set EMAIL_HOST (+ user/password) to
+# send real mail over SMTP.
+EMAIL_HOST = env("EMAIL_HOST")
+EMAIL_PORT = env("EMAIL_PORT")
+EMAIL_HOST_USER = env("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
+EMAIL_USE_TLS = env("EMAIL_USE_TLS")
+EMAIL_USE_SSL = env("EMAIL_USE_SSL")
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL")
+EMAIL_BACKEND = (
+    "django.core.mail.backends.smtp.EmailBackend"
+    if EMAIL_HOST
+    else "django.core.mail.backends.console.EmailBackend"
+)
+EMAIL_TIMEOUT = 10
 
 # ---------------------------------------------------------------------------
 # MQTT

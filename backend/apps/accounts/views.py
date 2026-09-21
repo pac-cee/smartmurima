@@ -22,15 +22,21 @@ from .serializers import (
     RegisterSerializer,
     UserSerializer,
 )
-from .services import AuthService
+from .services import AuthService, is_email_identifier
 
 
 def _issue_payload(result):
+    channel = "email" if is_email_identifier(result.identifier) else "sms"
     payload = {
         "identifier": result.identifier,
         "purpose": result.purpose,
         "expires_at": result.expires_at,
-        "detail": "Verification code sent.",
+        "channel": channel,
+        "detail": (
+            f"Verification code sent by {channel}."
+            if result.delivered
+            else "Could not deliver the code. Try again or use another contact."
+        ),
     }
     if result.dev_code is not None:
         payload["dev_code"] = result.dev_code  # dev/console gateway only

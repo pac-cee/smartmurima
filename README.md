@@ -57,8 +57,15 @@ docker compose logs -f simulator   # watch it publish every SIM_INTERVAL seconds
 | Django admin | http://localhost:8000/admin |
 | API docs (Swagger) | http://localhost:8000/api/docs |
 | pgAdmin | http://localhost:5050 |
+| Mailpit (OTP emails) | http://localhost:8025 |
 | Ollama | http://localhost:11434 |
 | MQTT | mqtt://localhost:1883 |
+
+Verification and password-reset codes sent to an email address arrive in the
+Mailpit inbox above. Codes sent to a phone number are printed in the backend
+logs (`docker logs sm_backend`) until `SMS_PROVIDER` is configured in `.env`.
+Check either channel with
+`docker exec sm_backend python manage.py check_otp_delivery <email-or-phone>`.
 
 ### Dev credentials
 | Where | Username / email | Password |

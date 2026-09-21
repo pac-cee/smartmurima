@@ -88,6 +88,17 @@ services:
       - "1883:1883"
       - "9001:9001"
 
+  # Local SMTP server so OTP emails are really sent (and readable) without a
+  # mail account: SMTP on 1025, web inbox on http://localhost:8025. Point
+  # EMAIL_HOST at a provider in .env when you want mail to leave the machine.
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: sm_mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
   backend:
     build: ./backend
     container_name: sm_backend
@@ -101,6 +112,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     command: >
       sh -c "python manage.py migrate &&
              python manage.py collectstatic --noinput &&

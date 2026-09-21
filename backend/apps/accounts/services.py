@@ -34,10 +34,14 @@ logger = logging.getLogger("smartmurima")
 
 
 # ---------------------------------------------------------------------------
-# SMS gateway
+# Delivery gateways
 # ---------------------------------------------------------------------------
 class SmsGateway:
     """Interface for delivering SMS. ``send`` returns True on success."""
+
+    #: True when the gateway does not really reach the user (dev/console), in
+    #: which case the API may echo the code back so local testing can proceed.
+    dev_visible = False
 
     def send(self, to: str, message: str) -> bool:  # pragma: no cover - interface
         raise NotImplementedError
@@ -45,6 +49,8 @@ class SmsGateway:
 
 class ConsoleSmsGateway(SmsGateway):
     """Dev backend: prints the message (with the OTP) to the console/logs."""
+
+    dev_visible = True
 
     def send(self, to: str, message: str) -> bool:
         logger.warning("[SMS:console] to=%s | %s", to, message)
@@ -81,15 +87,146 @@ class HttpSmsGateway(SmsGateway):
             return False
 
 
-def get_sms_gateway() -> SmsGateway:
-    provider = getattr(settings, "SMS_PROVIDER", "")
-    if provider:
-        return HttpSmsGateway(
-            provider=provider,
-            api_key=getattr(settings, "SMS_API_KEY", ""),
-            sender_id=getattr(settings, "SMS_SENDER_ID", "SmartMurima"),
+class AfricasTalkingSmsGateway(SmsGateway):
+    """Africa's Talking SMS (https://developers.africastalking.com).
+
+    Form-encoded POST with an ``apiKey`` header -- not the JSON + Bearer shape
+    of ``HttpSmsGateway``. Username ``sandbox`` targets the sandbox endpoint,
+    where messages are free and visible in the simulator rather than delivered
+    to a handset. ``sender_id`` is only sent when set: Africa's Talking rejects
+    an alphanumeric sender that is not a registered sender ID for the account.
+    """
+
+    LIVE_URL = "https://api.africastalking.com/version1/messaging"
+    SANDBOX_URL = "https://api.sandbox.africastalking.com/version1/messaging"
+    #: 100 processed, 101 sent, 102 queued -- anything else failed.
+    ACCEPTED_STATUS = {100, 101, 102}
+
+    def __init__(
+        self,
+        username: str,
+        api_key: str,
+        sender_id: str = "",
+        api_url: str = "",
+    ):
+        self.username = username or "sandbox"
+        self.api_key = api_key
+        self.sender_id = sender_id
+        self.api_url = api_url or (
+            self.SANDBOX_URL if self.username == "sandbox" else self.LIVE_URL
         )
-    return ConsoleSmsGateway()
+
+    def send(self, to: str, message: str) -> bool:
+        import requests
+
+        data = {"username": self.username, "to": to, "message": message}
+        if self.sender_id:
+            data["from"] = self.sender_id
+
+        try:
+            resp = requests.post(
+                self.api_url,
+                data=data,  # form-encoded, as the API requires
+                headers={
+                    "apiKey": self.api_key,
+                    "Accept": "application/json",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                timeout=10,
+            )
+            resp.raise_for_status()
+            payload = resp.json()
+        except Exception as exc:
+            logger.error("Africa's Talking request failed: %s", exc)
+            return False
+
+        # A 201 only means the request was accepted; per-recipient status says
+        # whether the message was actually taken for delivery.
+        recipients = (payload.get("SMSMessageData") or {}).get("Recipients") or []
+        if not recipients:
+            logger.error(
+                "Africa's Talking accepted no recipients: %s",
+                (payload.get("SMSMessageData") or {}).get("Message", payload),
+            )
+            return False
+
+        ok = all(int(r.get("statusCode", 0)) in self.ACCEPTED_STATUS for r in recipients)
+        if not ok:
+            logger.error(
+                "Africa's Talking rejected delivery: %s",
+                [(r.get("number"), r.get("status")) for r in recipients],
+            )
+        return ok
+
+
+def get_sms_gateway() -> SmsGateway:
+    """Pick the SMS gateway from settings.
+
+    ``SMS_PROVIDER`` is either the name of a built-in provider
+    ("africastalking") or a plain URL for the generic HTTP gateway. Blank means
+    dev: print the code to the console.
+    """
+    provider = (getattr(settings, "SMS_PROVIDER", "") or "").strip()
+    if not provider:
+        return ConsoleSmsGateway()
+
+    if provider.lower() in ("africastalking", "africas_talking", "at"):
+        return AfricasTalkingSmsGateway(
+            username=getattr(settings, "SMS_USERNAME", ""),
+            api_key=getattr(settings, "SMS_API_KEY", ""),
+            sender_id=getattr(settings, "SMS_SENDER_ID", ""),
+            api_url=getattr(settings, "SMS_API_URL", ""),
+        )
+
+    return HttpSmsGateway(
+        provider=provider,
+        api_key=getattr(settings, "SMS_API_KEY", ""),
+        sender_id=getattr(settings, "SMS_SENDER_ID", "") or "SmartMurima",
+    )
+
+
+class EmailGateway:
+    """Delivers a code by email through whatever EMAIL_BACKEND is configured.
+
+    With the console/locmem backends nothing leaves the machine, so the code is
+    still exposed as ``dev_code`` -- the same affordance the console SMS gateway
+    gives. Point EMAIL_HOST at a real SMTP server to send for real.
+    """
+
+    def __init__(self, from_email: Optional[str] = None):
+        self.from_email = from_email or getattr(
+            settings, "DEFAULT_FROM_EMAIL", "no-reply@smartmurima.rw"
+        )
+
+    @property
+    def dev_visible(self) -> bool:
+        backend = getattr(settings, "EMAIL_BACKEND", "")
+        return any(k in backend for k in ("console", "locmem", "dummy", "filebased"))
+
+    def send(self, to: str, message: str, subject: str = "") -> bool:
+        from django.core.mail import send_mail
+
+        try:
+            sent = send_mail(
+                subject or "Your SmartMurima code",
+                message,
+                self.from_email,
+                [to],
+                fail_silently=False,
+            )
+            return bool(sent)
+        except Exception as exc:  # pragma: no cover - network/SMTP
+            logger.error("Email delivery failed: %s", exc)
+            return False
+
+
+def get_email_gateway() -> EmailGateway:
+    return EmailGateway()
+
+
+def is_email_identifier(identifier: str) -> bool:
+    """Identifiers are either an email address or an E.164 phone number."""
+    return "@" in (identifier or "")
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +237,8 @@ class OtpIssueResult:
     identifier: str
     purpose: str
     expires_at: object
-    dev_code: Optional[str] = None  # populated only when using console gateway
+    dev_code: Optional[str] = None  # populated only when using a dev gateway
+    delivered: bool = True  # False when the gateway could not hand it off
 
 
 class OtpService(BaseService):
@@ -115,10 +253,12 @@ class OtpService(BaseService):
         otp_repo: Optional[OtpRepository] = None,
         user_repo: Optional[UserRepository] = None,
         sms: Optional[SmsGateway] = None,
+        email: Optional[EmailGateway] = None,
     ):
         self.otp_repo = otp_repo or OtpRepository()
         self.user_repo = user_repo or UserRepository()
         self.sms = sms or get_sms_gateway()
+        self.email = email or get_email_gateway()
 
     # -- hashing ----------------------------------------------------------
     @staticmethod
@@ -167,20 +307,30 @@ class OtpService(BaseService):
             expires_at=expires_at,
         )
 
-        message = (
-            f"SmartMurima code: {code} (valid {ttl // 60} min). "
-            "Do not share this code."
-        )
-        delivered = self.sms.send(identifier, message)
+        # Identifiers are an email address or a phone number, so pick the
+        # channel that matches -- an email address handed to the SMS gateway
+        # was never going to arrive anywhere.
+        gateway = self.email if is_email_identifier(identifier) else self.sms
+        delivered = gateway.send(identifier, self._message(code, ttl, purpose))
         if not delivered:
             logger.error("OTP delivery failed for %s", identifier)
 
-        dev_code = code if isinstance(self.sms, ConsoleSmsGateway) else None
         return OtpIssueResult(
             identifier=identifier,
             purpose=purpose,
             expires_at=expires_at,
-            dev_code=dev_code,
+            # Only echoed back when the channel cannot actually reach the user
+            # (console SMS, console/locmem email) so local dev still works.
+            dev_code=code if gateway.dev_visible else None,
+            delivered=delivered,
+        )
+
+    @staticmethod
+    def _message(code: str, ttl: int, purpose: str) -> str:
+        what = "password reset" if purpose == OtpPurpose.RESET else "verification"
+        return (
+            f"SmartMurima {what} code: {code} (valid {ttl // 60} min). "
+            "Do not share this code."
         )
 
     # -- verify -----------------------------------------------------------
