@@ -5,10 +5,16 @@ consistent with `docker-compose.yml` and the layered architecture in `../SRS.md`
 the direction of dependency / data flow; edge labels name the interface or protocol. GitHub and the
 Artifact viewer render Mermaid natively.
 
+> **Telemetry transport:** field nodes speak **plain HTTP JSON** directly to the
+> backend's `/api/v1/iot/` endpoints. There is no message broker and no separate
+> ingestion worker: an ESP32 already has an HTTP client, and dropping the broker
+> removes a service to run, secure and reason about. The trade-off is that
+> buffering now lives on the device (it retries) rather than in a broker.
+
 ```mermaid
 flowchart TB
     subgraph FIELD["Field / edge"]
-        ESP["IoT Sensor Nodes (ESP32)"]
+        ESP["IoT Sensor Nodes (ESP32)<br/>+ simulate_devices (virtual node)"]
     end
 
     subgraph EDGE["Reverse proxy"]
@@ -18,29 +24,31 @@ flowchart TB
     subgraph APP["Application containers"]
         FE["Web Frontend (Next.js 14)"]
         BE["Backend API (Django REST Framework)"]
-        ING["Ingestion Service (run_ingestion, paho-mqtt)"]
+        IOT["IoT endpoints (announce + telemetry)<br/>IngestionService"]
     end
 
     subgraph INTEL["Intelligence services"]
         ML["ML Service (RF / XGBoost / MobileNetV2 CNN)"]
         RAGSVC["AI Assistant / RAG (Retriever + PromptBuilder)"]
-        OLLAMA["Ollama runtime (Llama 3.1 8B + nomic-embed-text)"]
+        OLLAMA["Ollama runtime (qwen2.5:0.5b + nomic-embed-text)"]
     end
 
-    subgraph DATA["Data and messaging"]
+    subgraph DATA["Data"]
         DB["PostgreSQL + pgvector"]
-        MQTT["MQTT Broker (Mosquitto)"]
     end
 
     WAPI["Weather API (external)"]
 
-    ESP -->|"MQTT publish smartmurima/&lt;id&gt;/telemetry"| MQTT
-    MQTT -->|"subscribe telemetry"| ING
-    ING -->|"persist SensorReading (ORM)"| DB
+    ESP -->|"POST /iot/announce/ (pairing)"| IOT
+    ESP -->|"POST /iot/telemetry/ (readings + pump state)"| IOT
+    IOT -->|"{command} pump_mode / thresholds"| ESP
+    IOT -->|"persist SensorReading (ORM)"| DB
+    IOT -->|"raise low-moisture Alert"| DB
 
     NGINX -->|"HTTPS"| FE
     NGINX -->|"HTTPS /api/v1"| BE
     FE -->|"REST + SSE (JWT)"| BE
+    BE -->|"claim / pump / thresholds"| IOT
 
     BE -->|"SQL / ORM"| DB
     BE -->|"inference (RF/XGB/CNN)"| ML
@@ -56,14 +64,21 @@ flowchart TB
 
 | Component | Container | Provides | Depends on |
 |---|---|---|---|
-| Web Frontend | `frontend` | UI (dashboards, chat, upload) | Backend API (REST + SSE) via Nginx |
+| Web Frontend | `frontend` | UI (dashboards, devices, chat, upload) | Backend API (REST + SSE) via Nginx |
 | Nginx | (reverse proxy) | TLS termination, routing, static assets | Frontend, Backend |
 | Backend API | `backend` | REST `/api/v1`, auth/RBAC, orchestration | DB, ML Service, AI Assistant, Weather API |
-| Ingestion Service | `ingestion` | MQTT→DB telemetry persistence | MQTT Broker, DB |
+| IoT endpoints | (in `backend` / `apps/sensors/iot_views.py`) | device pairing, telemetry ingest, pump command | DB |
 | ML Service | (in backend / `ml/`) | irrigation/fertilizer/yield + CNN inference | DB (features), model artifacts |
 | AI Assistant / RAG | (in backend / `rag/`) | grounded answers + sources | pgvector store, Ollama |
-| Ollama | `ollama` | LLM chat + embeddings | model weights (llama3.1:8b, nomic-embed-text) |
+| Ollama | `ollama` | LLM chat + embeddings | model weights (qwen2.5:0.5b, nomic-embed-text) |
 | PostgreSQL + pgvector | `db` | relational + vector persistence | — |
-| MQTT Broker | `mqtt` | telemetry pub/sub + buffering | — |
+| Simulator | `simulator` (profile `iot`) | a virtual field node for demos | Backend IoT endpoints |
 | Weather API | external | forecasts (optional, cached) | — |
-</content>
+
+## Why the device is authenticated, not the user
+
+A field node has no user session. It authenticates with a per-device token that
+the backend mints when a farmer **claims** it, and which the board collects on
+its next announce. That keeps an unpaired board — anyone's board — from writing
+into a farmer's field, without ever putting a shared secret in the firmware
+image. See `../IOT_INTEGRATION.md` §2.

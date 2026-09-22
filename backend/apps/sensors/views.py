@@ -1,4 +1,8 @@
-"""Sensors controllers. Ingestion is internal (MQTT), so these are read-only."""
+"""Sensors read controllers.
+
+Writes arrive from devices over the IoT endpoints (``iot_views``), never from
+these routes -- so everything here is read-only.
+"""
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated

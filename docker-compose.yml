@@ -22,10 +22,13 @@ services:
       timeout: 5s
       retries: 5
 
+  # Optional DB browser. Day-to-day management is the Django admin, so this is
+  # opt-in: `docker compose --profile tools up -d pgadmin`.
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: sm_pgadmin
     restart: unless-stopped
+    profiles: ["tools"]
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@smartmurima.rw}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
@@ -40,56 +43,55 @@ services:
         condition: service_healthy
 
   # Local LLM runtime for the RAG assistant (Llama 3.1 8B).
+  # Local LLM runtime for the RAG assistant.
+  #
+  # This container pulls its own models on first boot and then serves them --
+  # there is no second "init" container to sit in the container list looking
+  # like it crashed. Models live in the `ollama_data` volume, so a restart
+  # re-checks them in milliseconds and downloads nothing.
   ollama:
     image: ollama/ollama:latest
     container_name: sm_ollama
     restart: unless-stopped
+    environment:
+      LLM_MODEL: ${LLM_MODEL:-qwen2.5:0.5b}
+      EMBED_MODEL: ${EMBED_MODEL:-nomic-embed-text}
+      # Unload an idle model instead of holding a GB of RAM all day, and never
+      # hold more than one at a time -- this box also runs Postgres and Next.
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-5m}
+      OLLAMA_MAX_LOADED_MODELS: "1"
     volumes:
       - ollama_data:/root/.ollama
     ports:
       - "11434:11434"
-    # Uncomment to enable GPU:
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices: [{ driver: nvidia, count: all, capabilities: [gpu] }]
-
-  # One-shot bootstrap: waits for Ollama, pulls the LLM + embedding models, exits.
-  # The main stack does NOT depend on this — the assistant degrades gracefully
-  # until the models finish downloading.
-  ollama-init:
-    image: ollama/ollama:latest
-    container_name: sm_ollama_init
-    restart: "no"
-    depends_on:
-      - ollama
-    environment:
-      OLLAMA_HOST: http://ollama:11434
-      LLM_MODEL: ${LLM_MODEL:-qwen2.5:0.5b}
-      EMBED_MODEL: ${EMBED_MODEL:-nomic-embed-text}
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >
-        echo "waiting for ollama at $${OLLAMA_HOST}...";
-        until ollama list >/dev/null 2>&1; do sleep 2; done;
-        echo "pulling $${LLM_MODEL}"; ollama pull "$${LLM_MODEL}";
-        echo "pulling $${EMBED_MODEL}"; ollama pull "$${EMBED_MODEL}";
-        echo "ollama model bootstrap complete"
-
-  # MQTT broker for ESP32 IoT telemetry.
-  mqtt:
-    image: eclipse-mosquitto:2
-    container_name: sm_mqtt
-    restart: unless-stopped
-    volumes:
-      - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
-      - mqtt_data:/mosquitto/data
-    ports:
-      - "1883:1883"
-      - "9001:9001"
+        ollama serve & server=$$!;
+        until ollama list >/dev/null 2>&1; do sleep 1; done;
+        for model in "$${LLM_MODEL}" "$${EMBED_MODEL}"; do
+          case "$${model}" in *:*) tagged="$${model}";; *) tagged="$${model}:latest";; esac;
+          if ollama list | cut -d" " -f1 | grep -qx "$${tagged}"; then
+            echo "$${model} already present";
+          else
+            echo "pulling $${model}...";
+            ollama pull "$${model}" 2>&1 | tail -1;
+          fi;
+        done;
+        echo "ollama ready";
+        wait $$server
+    healthcheck:
+      # Healthy only once the models are actually in place, so the assistant is
+      # never called before it can answer.
+      test: ["CMD-SHELL", "ollama list | grep -q . || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
 
   backend:
     build: ./backend
+    image: smartmurima-backend
     container_name: sm_backend
     restart: unless-stopped
     env_file: .env
@@ -101,6 +103,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
     command: >
       sh -c "python manage.py migrate &&
              python manage.py collectstatic --noinput &&
@@ -109,22 +117,15 @@ services:
              (python manage.py seed_demo || true) &&
              gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 180"
 
-  # MQTT->DB ingestion worker (same image as backend, different entrypoint).
-  ingestion:
-    build: ./backend
-    container_name: sm_ingestion
-    restart: unless-stopped
-    env_file: .env
-    volumes:
-      - ./backend:/app
-    depends_on:
-      - backend
-      - mqtt
-    command: python manage.py run_ingestion
-
   # Frontend runs in dev mode against the LIVE backend API (mocks disabled), so
-  # the browser consumes real data end-to-end. Linux-native node_modules live in
-  # a named volume so host (macOS) binaries never leak into the container.
+  # you can edit a file and see it reload. Linux-native node_modules live in a
+  # named volume so host (macOS) binaries never leak into the container.
+  #
+  # `next dev` compiles a route the first time it is requested -- 5.3s for
+  # /farms, 2.5s for /dashboard -- which is why the sidebar used to hang on the
+  # first click of each item. The background warm-up below requests every route
+  # once as soon as the server is up, so by the time anyone clicks, the route is
+  # already compiled. Hot reload still works exactly as before.
   frontend:
     image: node:20-alpine
     container_name: sm_frontend
@@ -133,6 +134,7 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
       NEXT_PUBLIC_API_MOCKING: ${NEXT_PUBLIC_API_MOCKING:-disabled}
+      NEXT_TELEMETRY_DISABLED: "1"
     volumes:
       - ./frontend:/app
       - fe_node_modules:/app/node_modules
@@ -140,30 +142,53 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - backend
-    command: sh -c "corepack enable && corepack prepare pnpm@9 --activate && pnpm install && pnpm dev -p 3000 -H 0.0.0.0"
+      backend:
+        condition: service_healthy
+    # NOTE the braces: `A && B & C` would background the WHOLE chain and start
+    # `pnpm dev` before corepack had installed pnpm. Install runs to completion
+    # first; only the warm-up loop is backgrounded, alongside the dev server.
+    command: >
+      sh -c "corepack enable &&
+             corepack prepare pnpm@9 --activate &&
+             pnpm install &&
+             { ( until wget -qO- http://localhost:3000/login >/dev/null 2>&1; do sleep 2; done;
+                 for r in dashboard farms sensors devices recommendations diseases assistant alerts reports settings register forgot-password; do
+                   wget -qO- \"http://localhost:3000/$$r\" >/dev/null 2>&1 || true;
+                 done;
+                 echo '>> all routes pre-compiled - navigation is warm' ) &
+               pnpm dev -p 3000 -H 0.0.0.0; }"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/login >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
 
-  # Virtual ESP32 telemetry publisher. Only runs when explicitly requested:
+  # Virtual ESP32 field node. Posts to the backend's HTTP IoT endpoint exactly
+  # as the real firmware does. Only runs when asked for:
   #   docker compose --profile iot up -d simulator
   simulator:
-    build: ./iot/simulator
+    # Same image as the backend -- the simulator is just a management command,
+    # so it never needs a build of its own.
+    image: smartmurima-backend
     container_name: sm_simulator
     restart: unless-stopped
     profiles: ["iot"]
+    env_file: .env
+    volumes:
+      - ./backend:/app
     depends_on:
-      - mqtt
-      - backend
-    environment:
-      MQTT_HOST: ${MQTT_HOST:-mqtt}
-      MQTT_PORT: ${MQTT_PORT:-1883}
-      SIM_DEVICES: ${SIM_DEVICES:-SM-NODE-01,SM-NODE-02}
-      SIM_INTERVAL: ${SIM_INTERVAL:-10}
+      backend:
+        condition: service_healthy
+    command: >
+      python manage.py simulate_devices
+      --base-url http://backend:8000/api/v1
+      --interval ${SIM_INTERVAL:-10}
 
 volumes:
   db_data:
   pgadmin_data:
   ollama_data:
-  mqtt_data:
   media_data:
   fe_node_modules:
   fe_next:

@@ -10,7 +10,8 @@ import io
 from datetime import datetime
 from typing import Optional
 
-from django.db.models import Avg, Count, Max, Min
+from django.db.models import Avg, Count, Max, Min, Sum
+from django.db.models.functions import TruncDay
 
 from core.exceptions import NotFoundError, PermissionDeniedError
 from core.services import BaseService
@@ -83,6 +84,9 @@ class ReportService(BaseService):
             for row in recs.values("type").annotate(n=Count("id"))
         }
 
+        disease_total = diseases.count()
+        disease_unhealthy = diseases.filter(is_healthy=False).count()
+
         return {
             "farm": farm_id,
             "field_count": fields.count(),
@@ -90,15 +94,104 @@ class ReportService(BaseService):
             "recommendations_by_type": rec_by_type,
             "readings": {k: _round(v) for k, v in agg.items()},
             "disease_reports": {
-                "total": diseases.count(),
-                "unhealthy": diseases.filter(is_healthy=False).count(),
+                "total": disease_total,
+                "unhealthy": disease_unhealthy,
             },
             "yield": self._latest_yield(recs),
+            # --- chart-ready series. A report that is only numbers is a table;
+            # these are what make it readable at a glance. ---
+            "series": self._daily_series(readings),
+            "moisture_distribution": self._moisture_distribution(readings),
+            "advice_breakdown": [
+                {"type": t, "count": n} for t, n in sorted(rec_by_type.items())
+            ],
+            "health_breakdown": [
+                {"label": "healthy", "count": disease_total - disease_unhealthy},
+                {"label": "unhealthy", "count": disease_unhealthy},
+            ],
+            "per_field": self._per_field(fields, readings),
             "empty": (agg["reading_count"] or 0) == 0
             and recs.count() == 0
-            and diseases.count() == 0,
+            and disease_total == 0,
             "generated_at": datetime.utcnow().isoformat() + "Z",
         }
+
+    @staticmethod
+    def _daily_series(readings) -> list[dict]:
+        """One point per day: the trend line/area of the report."""
+        rows = (
+            readings.annotate(day=TruncDay("recorded_at"))
+            .values("day")
+            .annotate(
+                soil_moisture=Avg("soil_moisture"),
+                temperature=Avg("temperature"),
+                humidity=Avg("humidity"),
+                rainfall=Sum("rainfall"),
+                reading_count=Count("id"),
+            )
+            .order_by("day")
+        )
+        return [
+            {
+                "date": r["day"].date().isoformat(),
+                "soil_moisture": _round(r["soil_moisture"]),
+                "temperature": _round(r["temperature"]),
+                "humidity": _round(r["humidity"]),
+                "rainfall": _round(r["rainfall"]),
+                "reading_count": r["reading_count"],
+            }
+            for r in rows
+            if r["day"] is not None
+        ]
+
+    # How much of the period sat in each irrigation band. This is the pie that
+    # answers "was this field actually watered enough?".
+    MOISTURE_BANDS = (
+        ("dry", 0, 25),
+        ("low", 25, 40),
+        ("optimal", 40, 65),
+        ("wet", 65, 101),
+    )
+
+    @classmethod
+    def _moisture_distribution(cls, readings) -> list[dict]:
+        buckets = []
+        for label, low, high in cls.MOISTURE_BANDS:
+            buckets.append(
+                {
+                    "label": label,
+                    "count": readings.filter(
+                        soil_moisture__gte=low, soil_moisture__lt=high
+                    ).count(),
+                }
+            )
+        return buckets
+
+    @staticmethod
+    def _per_field(fields, readings) -> list[dict]:
+        """Section-by-section comparison -- the bar chart."""
+        by_field = {
+            row["sensor_node__field_id"]: row
+            for row in readings.values("sensor_node__field_id").annotate(
+                avg_soil_moisture=Avg("soil_moisture"),
+                avg_temperature=Avg("temperature"),
+                reading_count=Count("id"),
+            )
+        }
+        out = []
+        for field in fields.select_related("crop"):
+            row = by_field.get(field.id, {})
+            out.append(
+                {
+                    "field": field.id,
+                    "name": field.name,
+                    "crop": field.crop.name if field.crop_id else None,
+                    "avg_soil_moisture": _round(row.get("avg_soil_moisture")),
+                    "avg_temperature": _round(row.get("avg_temperature")),
+                    "reading_count": row.get("reading_count", 0),
+                }
+            )
+        return out
 
     @staticmethod
     def _latest_yield(recs) -> Optional[dict]:

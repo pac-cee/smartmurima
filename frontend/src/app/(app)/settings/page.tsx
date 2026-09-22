@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ApiError } from '@/lib/api';
-import { useChangePassword, useSession, useUpdateProfile } from '@/hooks/useAuth';
+import { useChangePassword, useMe, useSession, useUpdateProfile } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
@@ -21,7 +21,11 @@ export default function SettingsPage() {
   const tc = useTranslations('common');
   const ta = useTranslations('auth');
   const tl = useTranslations('location');
-  const { user } = useSession();
+  const { user: sessionUser } = useSession();
+  // Re-read the account on mount: the cached session can be stale (an admin
+  // edit, another tab), and this screen is where people come to fix details.
+  const { data: fetchedUser } = useMe();
+  const user = fetchedUser ?? sessionUser;
   const update = useUpdateProfile();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);

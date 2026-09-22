@@ -102,16 +102,65 @@ class NodeStatus(models.TextChoices):
     MAINTENANCE = "maintenance", "Maintenance"
 
 
+class PumpMode(models.TextChoices):
+    AUTO = "auto", "Auto (device decides from soil moisture)"
+    MANUAL = "manual", "Manual (farmer overrides)"
+
+
+# A device is considered live if it reported within this many seconds.
+DEVICE_ONLINE_WINDOW_SECONDS = 60
+
+
 class SensorNode(models.Model):
+    """A physical field node (ESP32) and everything the backend knows about it.
+
+    Lifecycle: the board boots unpaired, announces its ``hardware_id`` to
+    ``/iot/announce/`` and sits in the discovery list with ``field=None``. A
+    farmer claims it against one of their fields, which mints ``token``; the
+    next announce hands that token back and the board starts posting telemetry.
+    """
+
     field = models.ForeignKey(
-        Field, on_delete=models.CASCADE, related_name="sensor_nodes"
+        Field,
+        on_delete=models.CASCADE,
+        related_name="sensor_nodes",
+        null=True,
+        blank=True,
+        help_text="Null while the device is discovered but not yet claimed.",
     )
     device_id = models.CharField(max_length=120, unique=True)
+    # The ESP32's own immutable identity (MAC-derived), reported on announce.
+    hardware_id = models.CharField(
+        max_length=120, unique=True, null=True, blank=True
+    )
+    name = models.CharField(max_length=120, blank=True, default="")
+    # Shared secret the firmware posts telemetry with. Minted on claim.
+    token = models.CharField(max_length=64, unique=True, null=True, blank=True)
     status = models.CharField(
         max_length=20, choices=NodeStatus.choices, default=NodeStatus.ACTIVE
     )
     battery = models.PositiveSmallIntegerField(default=100)
     last_seen = models.DateTimeField(null=True, blank=True)
+
+    # -- irrigation control (mirrored back to the device on every telemetry POST)
+    pump_mode = models.CharField(
+        max_length=10, choices=PumpMode.choices, default=PumpMode.AUTO
+    )
+    pump_on = models.BooleanField(
+        null=True,
+        blank=True,
+        help_text="Manual-mode target state. Null means 'let the device decide'.",
+    )
+    pump_state = models.BooleanField(
+        default=False, help_text="Last pump state the device reported."
+    )
+    dry_level = models.PositiveSmallIntegerField(
+        default=40, help_text="Soil moisture %% below which the pump turns on."
+    )
+    wet_level = models.PositiveSmallIntegerField(
+        default=65, help_text="Soil moisture %% above which the pump turns off."
+    )
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
 
     class Meta:
         db_table = "farms_sensor_node"
@@ -121,6 +170,10 @@ class SensorNode(models.Model):
                 check=models.Q(battery__gte=0) & models.Q(battery__lte=100),
                 name="node_battery_range",
             ),
+            models.CheckConstraint(
+                check=models.Q(dry_level__lt=models.F("wet_level")),
+                name="node_dry_below_wet",
+            ),
         ]
 
     def __str__(self):
@@ -128,4 +181,18 @@ class SensorNode(models.Model):
 
     @property
     def owner_user(self):
-        return self.field.farm.farmer
+        # Unclaimed devices have no owner; permissions fall back to admins.
+        return self.field.farm.farmer if self.field_id else None
+
+    @property
+    def is_claimed(self) -> bool:
+        return self.field_id is not None
+
+    @property
+    def is_online(self) -> bool:
+        if self.last_seen is None:
+            return False
+        from django.utils import timezone
+
+        age = (timezone.now() - self.last_seen).total_seconds()
+        return age <= DEVICE_ONLINE_WINDOW_SECONDS

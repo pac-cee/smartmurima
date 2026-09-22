@@ -14,10 +14,10 @@ Cross-reference `API_CONTRACT.md`, `TRACEABILITY_MATRIX.md`, and the diagrams un
 | **Cooperative Admin / Agronomist** | Human | Manages farms, fields, and nodes for cooperative members; oversees member activity. |
 | **Extension Officer** | Human | Reviews dashboards/reports across supported farmers; validates guidance; reviews disease reports. |
 | **System Administrator** | Human | Manages users/roles, sensor-node registry, and the RAG knowledge corpus. |
-| **IoT Sensor Node** | System | ESP32 node; publishes telemetry over MQTT. |
+| **IoT Sensor Node** | System | ESP32 node; POSTs telemetry to `/api/v1/iot/telemetry/` and applies the pump command returned. |
 | **AI Engine** | System | ML models, CNN, and RAG/LLM producing intelligent outputs. |
 | **Weather API** | External | Supplies forecasts consumed by recommendation logic. |
-| **SMS Gateway** | External | Delivers OTP codes (console backend in dev). |
+| **SMS Gateway** | External | Delivers password-reset codes (console backend in dev). |
 
 ## Use case index (30 use cases across 8 domains)
 
@@ -44,40 +44,53 @@ Cross-reference `API_CONTRACT.md`, `TRACEABILITY_MATRIX.md`, and the diagrams un
 - **Main flow:**
   1. User submits `full_name, email, phone_number, password, role, language`.
   2. System validates uniqueness + password strength; creates an **inactive** `User`.
-  3. `OtpService` generates a 6-digit code, stores it **hashed** with TTL, purpose=`register`.
-  4. `SmsGateway` sends the code (dev: printed to console); UI advances to Verify OTP.
+  3. `AuthService` creates an **active** farmer plus its `Farmer` profile (with the
+     optional sector location) in one transaction.
+  4. The response carries the user and a JWT pair; the UI goes straight to the dashboard.
 - **Alternate flows:** A1 role defaults to `farmer` if omitted; A2 language defaults to `rw`.
-- **Exception flows:** E1 email/phone already exists → `409` `{code: "already_exists"}`, no OTP sent.
-  E2 weak password → `400` with field errors. E3 SMS send fails → account kept inactive, user may resend (UC-02).
-- **Postconditions:** Inactive user exists; an unconsumed OTP is pending.
+- **Exception flows:** E1 email/phone already exists → `409` `{code: "conflict"}`, nothing created.
+  E2 weak password → `400` with field errors.
+- **Postconditions:** An active farmer account exists and the caller holds a valid session.
 - **Business rules:** BR-A1 password ≥ 8 chars; BR-A2 account cannot authenticate until verified;
-  BR-A3 OTP length/TTL from env.
-- **Endpoints:** `POST /auth/register`, then `POST /auth/otp/resend`.
-- **UI:** `/register` → `/verify-otp`.
+  BR-A3 self-registration always creates role=farmer; other roles are provisioned in the Django admin.
+- **Endpoints:** `POST /auth/register` (single step; no verification round trip).
+- **UI:** `/register` → `/dashboard`.
 
-### UC-02 Verify OTP
-- **Actors:** Any registering/logging-in/resetting user.
+### UC-02 Reset a Forgotten Password
+- **Actors:** Any user who cannot sign in.
 - **Priority:** Must. **FR:** FR-01.
-- **Preconditions:** A pending, unconsumed, unexpired OTP exists for the identifier+purpose.
+- **Preconditions:** An account exists for the identifier.
 - **Main flow:**
-  1. User enters the 6-digit code.
-  2. `OtpService` hashes and compares, checks TTL, purpose, and attempt count.
-  3. On success: mark OTP `consumed`; for `register`/`login` activate account and **issue JWT access+refresh**.
-- **Exception flows:** E1 wrong code → increment attempts, `400 {code:"otp_invalid"}`; after **max attempts** lock the code (`423`/`429`) and require resend.
-  E2 expired → `400 {code:"otp_expired"}`, prompt resend. E3 already consumed → `400`.
-- **Postconditions:** Account active; tokens issued (register/login) or reset token granted.
+  1. User requests a reset for their email/phone.
+  2. `OtpService` issues a **hashed, TTL'd, single-use** code and delivers it via
+     `SmsGateway` (dev: printed to the backend log and echoed as `dev_code`).
+  3. User submits `identifier + code + new_password`.
+  4. `OtpService` compares in constant time, checks TTL, purpose and attempt count;
+     on success the code is consumed and the new password is set.
+- **Exception flows:** E1 wrong code → increment attempts, `400`; after **max attempts** the
+  code is invalidated and a new one must be requested (`429`). E2 expired → `400`, prompt
+  resend. E3 already consumed → `400`. E4 resend inside the cooldown → `429`.
+- **Postconditions:** Password changed; the code cannot be replayed.
 - **Business rules:** BR-A4 single-use; BR-A5 max N attempts then invalidate; BR-A6 constant-time compare.
-- **Endpoints:** `POST /auth/otp/verify`.
-- **UI:** `/verify-otp` (6-cell input, resend cooldown timer).
+- **Endpoints:** `POST /auth/password/reset/request`, `POST /auth/password/reset/confirm`.
+- **UI:** `/forgot-password` (6-cell code input, resend cooldown timer).
 
-### UC-03 Login (with optional 2FA)
+> **Design note.** Registration and login previously required an OTP round trip.
+> That step was removed: it blocked sign-up behind an SMS gateway that is not
+> provisioned in the pilot, and an unverifiable account is worse than an
+> unverified one. One-time codes now exist only where they carry their weight —
+> proving control of an identifier you are trying to *recover*.
+
+### UC-03 Login
 - **Priority:** Must. **FR:** FR-01.
-- **Preconditions:** Active, verified account.
-- **Main flow:** 1. User submits `identifier + password`. 2. System authenticates. 3. If 2FA enabled/first-device, issue login OTP (→ UC-02); else issue JWTs directly.
-- **Exception flows:** E1 bad credentials → `401 {code:"invalid_credentials"}` (generic, no user enumeration). E2 inactive account → `403 {code:"not_verified"}` + offer resend. E3 throttle after repeated failures → `429`.
-- **Postconditions:** Authenticated session (access+refresh in memory, refresh rotation).
-- **Endpoints:** `POST /auth/login` (+ `POST /auth/otp/verify`).
-- **UI:** `/login`.
+- **Preconditions:** An active account.
+- **Main flow:** 1. User submits `identifier + password` (username, email **or** phone).
+  2. System authenticates against the hashed password. 3. JWT access + refresh are issued.
+- **Exception flows:** E1 bad credentials → `400 {code:"validation_error"}` (generic, no user
+  enumeration). E2 deactivated account → `400` explaining to contact an administrator.
+  E3 throttle after repeated failures → `429` (scope `auth`, 20/min).
+- **Postconditions:** Authenticated session (access+refresh held client-side, silent refresh on 401).
+- **Endpoints:** `POST /auth/login`, `POST /auth/token/refresh`.
 
 ### UC-04 Reset Password (OTP)
 - **Main flow:** request → OTP sent → confirm with `code + new_password`.
@@ -131,17 +144,29 @@ Cross-reference `API_CONTRACT.md`, `TRACEABILITY_MATRIX.md`, and the diagrams un
 
 ### UC-11 Ingest Sensor Data (IoT → System)
 - **Actors:** IoT Sensor Node (primary), AI Engine (downstream). **FR:** FR-02.
-- **Preconditions:** MQTT broker reachable; node `device_id` registered (UC-09).
+- **Preconditions:** The node has been claimed to a field and holds its token (UC-09).
 - **Main flow:**
-  1. Node publishes JSON `{device_id, soil_moisture, temperature, humidity, rainfall}` to `smartmurima/<id>/telemetry`.
-  2. Ingestion worker (subscribed) parses + validates payload.
-  3. **Deduplicate** on `(device_id, timestamp)`; persist `SensorReading` via repository against the mapped field.
-  4. Update node `last_seen`/battery; evaluate the low-moisture alert rule (→ UC-22).
-- **Alternate:** A1 broker buffers messages during backend downtime; worker drains on reconnect (no data loss).
-- **Exception flows:** E1 malformed JSON / out-of-range value (e.g. negative moisture, temp outside DHT22 range) → drop reading, log, do **not** crash. E2 unknown `device_id` → quarantine, log, raise `system` alert to admin. E3 duplicate → skip silently.
-- **Postconditions:** Valid reading stored and queryable; node liveness updated.
-- **Business rules:** BR-S1 readings immutable once stored; BR-S2 physically implausible values rejected; BR-S3 gaps flagged so dependent recommendations can be suppressed (see UC-14 E1).
-- **Realisation:** `run_ingestion` management command (paho-mqtt). Not a public HTTP endpoint.
+  1. Node POSTs `{token, pump, readings:[{sensor_type, value, optimal_min, optimal_max}]}`
+     to `/api/v1/iot/telemetry/`.
+  2. The endpoint resolves the token to a `SensorNode` — the device authenticates
+     itself; no user session is involved.
+  3. Typed readings are flattened onto reading columns (moisture, temperature,
+     humidity, rainfall, pH, EC, N, P, K). Unknown `sensor_type`s are ignored, never rejected.
+  4. **Deduplicate** on `(sensor_node, recorded_at)`; persist `SensorReading` via the repository.
+  5. Update node `last_seen`, battery and reported `pump_state`; evaluate the
+     low-moisture alert rule (→ UC-22).
+  6. Respond with the `{command}` block (pump mode/state + dry/wet thresholds) the device applies.
+- **Alternate:** A1 backend unreachable → the device retries on its next interval;
+  buffering lives on the device now that there is no broker.
+- **Exception flows:** E1 malformed JSON / out-of-range moisture → `400`, log, do **not** crash.
+  E2 unknown or revoked token → `403`; the board re-pairs automatically on its next announce.
+  E3 device not claimed to a field → `403`. E4 duplicate → skip silently.
+- **Postconditions:** Valid reading stored and queryable; node liveness and pump state updated.
+- **Business rules:** BR-S1 readings immutable once stored; BR-S2 physically implausible
+  values rejected; BR-S3 gaps flagged so dependent recommendations can be suppressed (see UC-14 E1).
+- **Realisation:** `apps/sensors/iot_views.py` + `IngestionService`. A public HTTP
+  endpoint authenticated by device token, exercised identically by the real
+  firmware and by `manage.py simulate_devices`.
 
 ### UC-12 View Monitoring Dashboard
 - **Actors:** Farmer, Coop Admin, Extension. **FR:** FR-03.

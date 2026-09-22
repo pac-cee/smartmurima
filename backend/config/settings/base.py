@@ -24,11 +24,10 @@ env = environ.Env(
     SMS_PROVIDER=(str, ""),
     SMS_API_KEY=(str, ""),
     SMS_SENDER_ID=(str, "SmartMurima"),
-    MQTT_HOST=(str, "mqtt"),
-    MQTT_PORT=(int, 1883),
-    MQTT_TOPIC=(str, "smartmurima/+/telemetry"),
     OLLAMA_HOST=(str, "http://ollama:11434"),
-    LLM_MODEL=(str, "llama3.1:8b"),
+    # Small by default: qwen2.5:0.5b is ~400MB and answers in seconds on a
+    # laptop CPU. Point LLM_MODEL at a bigger model only if you have the RAM.
+    LLM_MODEL=(str, "qwen2.5:0.5b"),
     EMBED_MODEL=(str, "nomic-embed-text"),
     RAG_TOP_K=(int, 4),
     EMBED_DIM=(int, 768),
@@ -179,6 +178,8 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "auth": "20/min",
         "otp": "5/min",
+        # Devices post every few seconds; keep the ceiling well clear of that.
+        "iot": "120/min",
     },
 }
 
@@ -305,12 +306,6 @@ SMS_PROVIDER = env("SMS_PROVIDER")
 SMS_API_KEY = env("SMS_API_KEY")
 SMS_SENDER_ID = env("SMS_SENDER_ID")
 
-# ---------------------------------------------------------------------------
-# MQTT
-# ---------------------------------------------------------------------------
-MQTT_HOST = env("MQTT_HOST")
-MQTT_PORT = env("MQTT_PORT")
-MQTT_TOPIC = env("MQTT_TOPIC")
 
 # ---------------------------------------------------------------------------
 # Ollama / RAG

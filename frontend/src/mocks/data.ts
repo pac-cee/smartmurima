@@ -188,6 +188,18 @@ export const mockFields: Field[] = [
   },
 ];
 
+// Mock nodes mirror the real device contract (claimed/online + pump control)
+// so the offline mock mode renders the same Devices UI as the live API.
+const DEVICE_DEFAULTS = {
+  is_claimed: true,
+  is_online: true,
+  pump_mode: 'auto',
+  pump_on: null,
+  pump_state: false,
+  dry_level: 40,
+  wet_level: 65,
+} satisfies Partial<SensorNode>;
+
 export const mockNodes: SensorNode[] = [
   {
     id: 'n1',
@@ -197,6 +209,7 @@ export const mockNodes: SensorNode[] = [
     status: 'active',
     battery: 82,
     last_seen: new Date(Date.now() - 4 * 60000).toISOString(),
+    ...DEVICE_DEFAULTS,
   },
   {
     id: 'n2',
@@ -206,6 +219,7 @@ export const mockNodes: SensorNode[] = [
     status: 'active',
     battery: 64,
     last_seen: new Date(Date.now() - 11 * 60000).toISOString(),
+    ...DEVICE_DEFAULTS,
   },
   {
     id: 'n3',
@@ -215,6 +229,7 @@ export const mockNodes: SensorNode[] = [
     status: 'inactive',
     battery: 12,
     last_seen: new Date(Date.now() - 26 * 60 * 60000).toISOString(),
+    ...DEVICE_DEFAULTS,
   },
   {
     id: 'n4',
@@ -224,6 +239,7 @@ export const mockNodes: SensorNode[] = [
     status: 'maintenance',
     battery: 48,
     last_seen: new Date(Date.now() - 3 * 60 * 60000).toISOString(),
+    ...DEVICE_DEFAULTS,
   },
 ];
 

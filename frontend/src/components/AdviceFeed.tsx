@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { ChevronDown, Droplets, FlaskConical, RefreshCw, Sprout } from 'lucide-react';
+import { toast } from 'sonner';
 import { ConfidenceBar } from '@/components/ConfidenceBar';
 import { EmptyState } from '@/components/EmptyState';
 import { CardSkeleton } from '@/components/Skeletons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useLatestRecommendations } from '@/hooks/useRecommendations';
+import { useLatestRecommendations, useRunAdvice } from '@/hooks/useRecommendations';
 import type { AdviceItem, RecommendationType } from '@/lib/schemas';
 import { cn, relativeTime } from '@/lib/utils';
 
@@ -79,8 +80,11 @@ export function AdviceItemCard({ item }: { item: AdviceItem }) {
 
 /**
  * Auto-advice feed for a single section (field). Fetches the latest bundle and
- * renders one card per advice type. There is no manual "request" trigger — the
- * only control is an optional Refresh (re-fetch).
+ * renders one card per advice type.
+ *
+ * Refresh does a real re-run: it POSTs to the irrigation/fertilizer/yield
+ * endpoints so the models score the newest telemetry, then re-reads the
+ * bundle. A plain re-fetch would just redisplay the same stored advice.
  */
 export function AdviceFeed({
   fieldId,
@@ -98,6 +102,20 @@ export function AdviceFeed({
   const t = useTranslations('recommendations');
   const tc = useTranslations('common');
   const query = useLatestRecommendations(fieldId);
+  const run = useRunAdvice();
+
+  const regenerate = () => {
+    if (!fieldId) return;
+    run.mutate(
+      { field: fieldId },
+      {
+        onSuccess: () => void query.refetch(),
+        // The models need telemetry to score: say so rather than failing mute.
+        onError: (error) => toast.error(error.message || 'Could not generate advice.'),
+      },
+    );
+  };
+  const busy = run.isPending || query.isFetching;
 
   if (!fieldId) {
     return <EmptyState icon={Sprout} title={t('selectSection')} />;
@@ -132,7 +150,19 @@ export function AdviceFeed({
   const items = limit ? (bundle?.items ?? []).slice(0, limit) : (bundle?.items ?? []);
 
   if (items.length === 0) {
-    return <EmptyState icon={Sprout} title={t('noAdvice')} description={t('noAdviceBody')} />;
+    return (
+      <EmptyState
+        icon={Sprout}
+        title={t('noAdvice')}
+        description={t('noAdviceBody')}
+        action={
+          <Button size="sm" onClick={regenerate} disabled={busy}>
+            <RefreshCw className={cn('size-4', busy && 'animate-spin')} />
+            {t('refresh')}
+          </Button>
+        }
+      />
+    );
   }
 
   return (
@@ -147,13 +177,8 @@ export function AdviceFeed({
             <span />
           )}
           {showRefresh && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => query.refetch()}
-              disabled={query.isFetching}
-            >
-              <RefreshCw className={cn('size-4', query.isFetching && 'animate-spin')} />
+            <Button variant="outline" size="sm" onClick={regenerate} disabled={busy}>
+              <RefreshCw className={cn('size-4', busy && 'animate-spin')} />
               {t('refresh')}
             </Button>
           )}

@@ -7,15 +7,18 @@ import {
   CloudRain,
   Cpu,
   Droplets,
+  FlaskConical,
   Layers,
   Loader2,
   MapPinned,
   Pencil,
   Plus,
   Radio,
+  Sprout,
   Thermometer,
   Trash2,
   Waves,
+  Zap,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CreateFarmDialog } from '@/components/CreateFarmDialog';
@@ -442,6 +445,11 @@ export default function SensorsPage() {
             </CardContent>
           </Card>
 
+          {/* Soil chemistry straight off the RS485 probe. Rendered whenever the
+              node reports any of these channels; a moisture-only node simply
+              has no card here. */}
+          <SoilChemistryCard latest={latest} t={t} />
+
           <div className="grid gap-6 lg:grid-cols-3">
             {/* Trend history */}
             <Card className="lg:col-span-2">
@@ -479,5 +487,51 @@ function Header({
       </div>
       <SensorStatus lastSeen={lastSeen} />
     </div>
+  );
+}
+
+/**
+ * The pH / EC / N-P-K block. Each channel is optional on the model, so a probe
+ * that reports none of them renders nothing rather than a row of em dashes.
+ */
+function SoilChemistryCard({
+  latest,
+  t,
+}: {
+  latest: { ph?: number | null; ec?: number | null; nitrogen?: number | null;
+            phosphorus?: number | null; potassium?: number | null };
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const channels = [
+    { key: 'ph', icon: FlaskConical, value: latest.ph, unit: '', decimals: 2 },
+    { key: 'ec', icon: Zap, value: latest.ec, unit: 'mS/cm', decimals: 2 },
+    { key: 'nitrogen', icon: Sprout, value: latest.nitrogen, unit: 'mg/kg', decimals: 0 },
+    { key: 'phosphorus', icon: Sprout, value: latest.phosphorus, unit: 'mg/kg', decimals: 0 },
+    { key: 'potassium', icon: Sprout, value: latest.potassium, unit: 'mg/kg', decimals: 0 },
+  ] as const;
+
+  const reported = channels.filter((c) => typeof c.value === 'number');
+  if (reported.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('soilChemistry')}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+          {reported.map((c) => (
+            <StatTile
+              key={c.key}
+              icon={c.icon}
+              label={t(c.key)}
+              value={c.value ?? null}
+              unit={c.unit}
+              decimals={c.decimals}
+            />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

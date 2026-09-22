@@ -2,8 +2,10 @@
 
 Creates a set of crops, one active demo farmer with a Farmer profile, a farm,
 three fields, and exactly two sensor nodes (``SM-NODE-01`` / ``SM-NODE-02`` --
-the fixed device-id contract an external simulator publishes to), plus ~48h of
-historical readings per node and a sample alert.
+the fixed device-id contract the simulator posts to), plus ~48h of historical
+readings per node and a sample alert. Both nodes get a fixed dev token so
+``manage.py simulate_devices`` can post telemetry the same way a real ESP32
+does, with no pairing step.
 
 Idempotent: safe to run repeatedly. Readings are generated only when a node has
 none yet, so re-running never duplicates telemetry.
@@ -33,9 +35,13 @@ CROPS = [
     ("Cassava", 12.0, "Season B"),
 ]
 
-# Fixed device-id contract: an external simulator publishes to these ids.
+# Fixed device-id contract: the simulator posts telemetry for these ids.
 NODE_A_DEVICE_ID = "SM-NODE-01"
 NODE_B_DEVICE_ID = "SM-NODE-02"
+# Well-known dev tokens. Real boards get a random token minted on claim; these
+# exist only so the simulator works out of the box on a fresh database.
+NODE_A_TOKEN = "dev-token-sm-node-01"
+NODE_B_TOKEN = "dev-token-sm-node-02"
 
 
 class Command(BaseCommand):
@@ -123,12 +129,36 @@ class Command(BaseCommand):
         # -- sensor nodes (fixed device-id contract) ----------------------
         node_a, _ = SensorNode.objects.get_or_create(
             device_id=NODE_A_DEVICE_ID,
-            defaults={"field": field_a, "status": "active", "battery": 92},
+            defaults={
+                "field": field_a,
+                "status": "active",
+                "battery": 92,
+                "name": "North Plot node",
+                "hardware_id": "SIM-AAAA01",
+                "token": NODE_A_TOKEN,
+            },
         )
         node_b, _ = SensorNode.objects.get_or_create(
             device_id=NODE_B_DEVICE_ID,
-            defaults={"field": field_b, "status": "active", "battery": 78},
+            defaults={
+                "field": field_b,
+                "status": "active",
+                "battery": 78,
+                "name": "South Plot node",
+                "hardware_id": "SIM-BBBB02",
+                "token": NODE_B_TOKEN,
+            },
         )
+        # Re-seeding an older database: make sure the dev tokens are in place,
+        # otherwise the simulator has nothing to authenticate with.
+        for node, token, hw in (
+            (node_a, NODE_A_TOKEN, "SIM-AAAA01"),
+            (node_b, NODE_B_TOKEN, "SIM-BBBB02"),
+        ):
+            if not node.token or not node.hardware_id:
+                node.token = node.token or token
+                node.hardware_id = node.hardware_id or hw
+                node.save(update_fields=["token", "hardware_id"])
 
         # -- ~48h of historical readings per node -------------------------
         rng = random.Random(42)
@@ -151,6 +181,11 @@ class Command(BaseCommand):
                         temperature=round(20 + rng.uniform(-3, 8), 1),
                         humidity=round(60 + rng.uniform(-10, 15), 1),
                         rainfall=round(max(0.0, rng.uniform(-2, 4)), 1),
+                        ph=round(6.2 + rng.uniform(-0.6, 0.6), 2),
+                        ec=round(1.1 + rng.uniform(-0.3, 0.4), 3),
+                        nitrogen=round(45 + rng.uniform(-12, 15)),
+                        phosphorus=round(28 + rng.uniform(-8, 10)),
+                        potassium=round(120 + rng.uniform(-25, 30)),
                         recorded_at=ts,
                     )
                 )

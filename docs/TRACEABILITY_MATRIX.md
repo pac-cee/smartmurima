@@ -8,8 +8,8 @@ dissertation's UT-/IT- cases plus added coverage (T-*).
 
 | FR | Requirement | Use Case(s) | Endpoint(s) | UI Route | Service / Logic | Tests |
 |---|---|---|---|---|---|---|
-| FR-01 | Registration, auth, RBAC, profiles | UC-01,02,03,04,05,06 | `/auth/register`,`/auth/otp/verify`,`/auth/otp/resend`,`/auth/login`,`/auth/token/refresh`,`/auth/password/reset/*`,`/auth/me` | `/register`,`/verify-otp`,`/login`,`/forgot-password`,`/settings` | AuthService, OtpService, SmsGateway, RBAC permissions | UT-05,UT-06,T-A1..A7 |
-| FR-02 | Sensor data capture (MQTT→DB) | UC-11 | `run_ingestion` (worker); `GET /sensor-readings` | — (worker) | Ingestion, SensorReadingRepository, dedup/validation | UT-01,UT-02,IT-01,T-S1..S3 |
+| FR-01 | Registration, auth, RBAC, profiles | UC-01,02,03,04,05,06 | `/auth/register`,`/auth/login`,`/auth/token/refresh`,`/auth/password/reset/*`,`/auth/password/change`,`/auth/me` | `/register`,`/login`,`/forgot-password`,`/settings` | AuthService, OtpService, SmsGateway, RBAC permissions | UT-05,UT-06,T-A1..A7 |
+| FR-02 | Sensor data capture (HTTP→DB) | UC-11 | `POST /iot/announce/`,`POST /iot/telemetry/`; `GET /sensor-readings` | `/devices` | IngestionService, SensorNodeService, SensorReadingRepository, dedup/validation | UT-01,UT-02,IT-01,T-S1..S3, `test_iot_endpoints.py` |
 | FR-03 | Monitoring dashboard | UC-12,13 | `/sensor-readings/latest`,`/sensor-readings?agg=`,`/recommendations`,`/alerts`,`/diseases/reports` | `/dashboard`,`/fields/[id]` | SensorService aggregation | IT-02,T-DB1,T-DB2 |
 | FR-04 | Irrigation recommendation | UC-14 | `POST /recommendations/irrigation` | `/recommendations` | FeatureBuilder, IrrigationClassifier, RecommendationService | UT-03,UT-04,T-R1..R4 |
 | FR-05 | Fertilizer recommendation | UC-15 | `POST /recommendations/fertilizer` | `/recommendations` | FertilizerRecommender | T-R5,T-R6 |
@@ -26,9 +26,9 @@ dissertation's UT-/IT- cases plus added coverage (T-*).
 
 | NFR | Requirement | Mechanism | Verified by |
 |---|---|---|---|
-| NFR-1 Performance | <3s interactions, near-real-time ingest | query indexes, pagination, TanStack cache, MQTT stream | load test T-P1; ingestion latency T-P2 |
+| NFR-1 Performance | <3s interactions, near-real-time ingest | query indexes, pagination, TanStack cache, direct HTTP ingest | load test T-P1; ingestion latency T-P2 |
 | NFR-2 Scalability | grow farmers/nodes/readings | service-oriented, containerised, stateless API, horizontal ingest/ML | architecture review; docker scale test |
-| NFR-3 Security | authn, RBAC, TLS, hashing, input validation | JWT+refresh rotation, hashed OTP, role+object perms, DRF validators, Nginx TLS | T-A6 (401), T-A7 (RBAC), security-review |
+| NFR-3 Security | authn, RBAC, TLS, hashing, input validation | JWT+refresh rotation, hashed reset codes, per-device tokens, role+object perms, DRF validators, Nginx TLS | T-A6 (401), T-A7 (RBAC), security-review |
 | NFR-4 Usability | low-literacy, icons, plain language | design system, rw default, ≥44px targets | acceptance session AT-* |
 | NFR-5 Reliability | graceful degradation | ML/CNN stubs, RAG "don't know", ingest drop-and-log, error handler | T-R (stub), T-AS2, T-S (bad payload) |
 | NFR-6 Availability/offline | intermittent connectivity | broker buffering, client cache, SSE reconnect | T-S (broker replay) |
@@ -41,7 +41,7 @@ Every endpoint in `API_CONTRACT.md` MUST appear here with an owning use case and
 implementation review, diff this list against the router; any route not listed is either
 undocumented (add it) or dead (remove it).
 
-`auth/register`→UC-01, `auth/otp/verify`→UC-02, `auth/otp/resend`→UC-01/02, `auth/login`→UC-03,
+`auth/register`→UC-01, `auth/password/reset/*`→UC-02, `auth/login`→UC-03,
 `auth/token/refresh`→UC-06, `auth/password/reset/request|confirm`→UC-04, `auth/me`→UC-05 ·
 `farms*`→UC-07, `fields*`→UC-08, `crops`→UC-08, `sensor-nodes*`→UC-09 ·
 `sensor-readings*`→UC-12/13, ingestion worker→UC-11 ·
@@ -60,8 +60,9 @@ undocumented (add it) or dead (remove it).
 - UT-04 irrigation classifier on sample input → valid class label + confidence in [0,1]
 - UT-05 assistant endpoint empty question → 400
 - UT-06 JWT-protected endpoint without token → 401
-- T-A1 register creates inactive user + pending OTP; T-A2 OTP verify activates + issues JWT;
-  T-A3 wrong OTP increments attempts; T-A4 expired OTP rejected; T-A5 max attempts locks;
+- T-A1 register creates an ACTIVE user and returns a JWT pair; T-A2 the returned token
+  works immediately and register→login round-trips; T-A3 duplicate email → 409;
+  T-A4 reset code is single-use/TTL'd; T-A5 max attempts invalidates the code;
   T-A6 login bad creds → 401 generic; T-A7 RBAC: farmer cannot hit `/admin-api/*` → 403
 - T-S1 dedup on (device_id,ts); T-S2 implausible value dropped; T-S3 unknown device quarantined
 - T-R1..R4 irrigation: happy path persists rec; stub fallback flagged; stale-data flag; critical→alert

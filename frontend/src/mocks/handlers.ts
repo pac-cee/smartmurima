@@ -208,6 +208,13 @@ export const handlers = [
       status: body.status ?? 'active',
       battery: body.battery ?? 100,
       last_seen: new Date().toISOString(),
+      is_claimed: true,
+      is_online: true,
+      pump_mode: 'auto',
+      pump_on: null,
+      pump_state: false,
+      dry_level: 40,
+      wet_level: 65,
     };
     nodes.unshift(node);
     return HttpResponse.json(node, { status: 201 });

@@ -7,7 +7,8 @@ from .models import SensorReading
 @admin.register(SensorReading)
 class SensorReadingAdmin(admin.ModelAdmin):
     list_display = ("sensor_node", "soil_moisture", "temperature", "humidity",
-                    "rainfall", "recorded_at")
+                    "rainfall", "ph", "ec", "nitrogen", "phosphorus",
+                    "potassium", "recorded_at")
     list_filter = ("sensor_node",)
     search_fields = ("sensor_node__device_id",)
     ordering = ("-recorded_at",)

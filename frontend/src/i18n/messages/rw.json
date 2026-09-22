@@ -19,7 +19,8 @@
       "grow": "Guhinga",
       "manage": "Gucunga"
     },
-    "sensors": "IoT"
+    "sensors": "IoT",
+    "devices": "Ibyuma"
   },
   "sections": {
     "section": "Igice",
@@ -187,7 +188,13 @@
     },
     "nodeAdded": "Igikoresho cyongewemo",
     "nodeRemoved": "Igikoresho cyakuweho",
-    "nodeBelongs": "Iki gikoresho kiri mu gice cyatoranyijwe cy'umurima wawe."
+    "nodeBelongs": "Iki gikoresho kiri mu gice cyatoranyijwe cy'umurima wawe.",
+    "ph": "pH y’ubutaka",
+    "ec": "Ubushobozi bwo kuyobora",
+    "nitrogen": "Azote (N)",
+    "phosphorus": "Fosifore (P)",
+    "potassium": "Potasiyumu (K)",
+    "soilChemistry": "Imiti y’ubutaka"
   },
   "farms": {
     "title": "Imirima",

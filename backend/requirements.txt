@@ -13,7 +13,7 @@ pgvector==0.3.6
 requests==2.32.3
 
 # ---- IoT ----
-paho-mqtt==2.1.0
+# Devices speak plain HTTP JSON to /api/v1/iot/ -- no broker client needed.
 
 # ---- ML (optional at runtime: services degrade to stubs if absent) ----
 numpy==1.26.4
