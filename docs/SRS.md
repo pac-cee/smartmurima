@@ -30,7 +30,7 @@ sensing, machine-learning recommendations, CNN-based crop-disease detection, and
 documents. The system:
 
 - captures soil-moisture, temperature, humidity, and rainfall telemetry from ESP32 sensor nodes
-  over MQTT and persists it against the correct farm and field;
+  over HTTPS and persists it against the correct farm and field;
 - generates irrigation, fertilizer, and yield recommendations from sensor, crop, and weather features
   using Random Forest / XGBoost models;
 - detects common crop diseases from leaf photographs using a MobileNetV2 convolutional neural network;
@@ -72,7 +72,7 @@ data-driven, localized decision support in a semi-arid, climate-vulnerable farmi
 | MCU | Microcontroller Unit |
 | MINAGRI | Ministry of Agriculture and Animal Resources |
 | ML | Machine Learning |
-| MQTT | Message Queuing Telemetry Transport |
+| JWT | JSON Web Token |
 | NDVI | Normalized Difference Vegetation Index |
 | NISR | National Institute of Statistics of Rwanda |
 | NPK | Nitrogen, Phosphorus, and Potassium |
@@ -119,8 +119,9 @@ system. It follows a **layered, service-oriented architecture** (dissertation §
 loosely coupled components communicate over well-defined interfaces:
 
 - **IoT sensing layer** — ESP32 nodes reading soil moisture (capacitive), temperature/humidity
-  (DHT22), and optional rainfall, publishing JSON telemetry over MQTT.
-- **Messaging & ingestion layer** — Eclipse Mosquitto MQTT broker decoupling intermittently
+  a 7-in-1 RS485 soil probe (moisture, temperature, pH, EC, N, P, K), POSTing
+  JSON telemetry over HTTPS to `/api/v1/iot/telemetry/`.
+- **Device ingestion layer** — token-authenticated HTTP endpoints accepting telemetry from intermittently
   connected nodes from the backend, plus an ingestion worker that validates, deduplicates, and
   persists readings.
 - **Application layer** — Django + Django REST Framework backend implementing domain logic, auth,
@@ -140,9 +141,9 @@ The component and deployment relationships are specified in `docs/diagrams/compo
 ### 2.2 Product Functions
 At a high level the system provides:
 
-1. Registration, OTP verification, login (optional OTP 2FA), password reset, profile/language
+1. Registration (single step), login, password reset by one-time code, profile/language
    management, and token refresh/logout with RBAC (FR-01).
-2. MQTT sensor-data capture, validation, deduplication, and persistence (FR-02).
+2. HTTP sensor-data capture, validation, deduplication, and persistence (FR-02).
 3. Monitoring dashboards and per-field detail with live readings, trends, alerts, and history (FR-03).
 4. Irrigation recommendations from ML models with confidence and provenance (FR-04).
 5. Fertilizer recommendations (FR-05).
@@ -170,15 +171,15 @@ Four **human actors** and three **system actors** (with an external SMS gateway)
 
 | Actor | Type | Role |
 |---|---|---|
-| **IoT Sensor Node** | System (ESP32) | Publishes telemetry over MQTT (UC-11). |
+| **IoT Sensor Node** | System (ESP32) | POSTs telemetry over HTTPS and applies the returned pump command (UC-11). |
 | **AI Engine** | System | ML models, CNN, and RAG/LLM producing intelligent outputs (UC-14–16, UC-18, UC-20). |
 | **Weather API** | External | Supplies cached forecasts to recommendation logic (UC-29). |
 | **SMS Gateway** | External | Delivers OTP codes; console backend in development (UC-01/02). |
 
 ### 2.4 Operating Environment
 The system is deployed with **Docker Compose** (project `smartmurima`) comprising the services
-`db` (pgvector/pgvector:pg17), `pgadmin`, `ollama`, `mqtt` (eclipse-mosquitto:2), `backend`
-(Django + Gunicorn), `ingestion` (MQTT worker `run_ingestion`), and `frontend` (Next.js).
+`db` (pgvector/pgvector:pg17), `pgadmin`, `ollama` (+ one-shot `ollama-init`), `backend`
+(Django + Gunicorn), `frontend` (Next.js), and the optional `simulator` (profile `iot`).
 
 | Concern | Environment |
 |---|---|
@@ -187,7 +188,7 @@ The system is deployed with **Docker Compose** (project `smartmurima`) comprisin
 | Frontend runtime | Node 20, Next.js 14, React 18 |
 | Database | PostgreSQL 15+/pg17 + pgvector |
 | LLM runtime | Ollama serving Llama 3.1 8B; nomic-embed-text embeddings |
-| Messaging | Eclipse Mosquitto 2.x (ports 1883 / 9001) |
+| Device transport | HTTPS JSON to `/api/v1/iot/` (no broker) |
 | Reverse proxy | Nginx 1.24 (TLS termination) |
 | Field devices | ESP32-WROOM-32 + capacitive soil-moisture v1.2 + DHT22 (+ optional rain sensor); Wi-Fi via site gateway/4G-LTE uplink |
 | Client devices | Smartphones, tablets, computers via modern web browser |
@@ -196,7 +197,7 @@ The system is deployed with **Docker Compose** (project `smartmurima`) comprisin
 - **Layered clean architecture is mandatory:** dependencies point inward
   (views → services → repositories → models); no business logic or ORM access in views (BACKEND_PROMPT).
 - **Fixed technology stack:** Django/DRF, PostgreSQL+pgvector, JWT+OTP, Ollama (Llama 3.1 8B) +
-  nomic-embed-text, Mosquitto/paho-mqtt, scikit-learn/XGBoost, TF/Keras CNN, Next.js/Tailwind/shadcn.
+  nomic-embed-text, scikit-learn/XGBoost, TF/Keras CNN, Next.js/Tailwind/shadcn.
 - **Design identity:** only three hues — green, white, black; semantic states expressed through green
   shades/black/opacity, never new hues (`DESIGN_SYSTEM.md`).
 - **All data models normalised to 3NF** with BIGSERIAL surrogate primary keys.
@@ -208,7 +209,7 @@ The system is deployed with **Docker Compose** (project `smartmurima`) comprisin
 - **Internationalisation:** Kinyarwanda default (`rw`) with English (`en`) toggle across UI and assistant.
 
 ### 2.6 Assumptions and Dependencies
-- Rural connectivity is **intermittent**; the MQTT broker buffers messages during backend downtime and
+- Rural connectivity is **intermittent**; the device retries telemetry on its next interval and
   the ingestion worker drains them on reconnect, so no readings are lost (NFR-6).
 - Clients cache recent data and reconnect SSE streams so the UI remains usable offline/degraded.
 - The external weather provider may be unavailable or lack an API key; recommendations must still
@@ -262,33 +263,39 @@ revoke tokens, all under role-based access control.
 
 **Endpoints:** `/auth/register`, `/auth/otp/verify`, `/auth/otp/resend`, `/auth/login`,
 `/auth/token/refresh`, `/auth/password/reset/request|confirm`, `/auth/me`.
-**UI:** `/register`, `/verify-otp`, `/login`, `/forgot-password`, `/settings`.
+**UI:** `/register`, `/login`, `/forgot-password`, `/settings`.
 
-### 3.2 FR-02 — Sensor Data Capture (MQTT → DB)
+### 3.2 FR-02 — Sensor Data Capture (HTTP → DB)
 **Use cases:** UC-11.
-**Description:** The system receives soil-moisture, temperature, humidity, and rainfall readings from
-IoT nodes via MQTT and persists them against the correct field and farm.
+**Description:** The system receives soil moisture, temperature, humidity, rainfall and soil chemistry
+(pH, EC, N, P, K) from IoT nodes over token-authenticated HTTPS, persists them against the correct
+field and farm, and returns the node's irrigation command in the same response.
 
 **Stimulus/response:**
-- *Stimulus:* node publishes JSON `{device_id, soil_moisture, temperature, humidity, rainfall}` to
-  `smartmurima/<id>/telemetry` → *Response:* the ingestion worker parses, validates, deduplicates on
-  `(device_id, timestamp)`, persists a `SensorReading` against the mapped field, updates node
-  `last_seen`/battery, and evaluates the low-moisture alert rule.
+- *Stimulus:* node POSTs `{token, pump, readings:[{sensor_type, value, optimal_min, optimal_max}]}`
+  to `/api/v1/iot/telemetry/` → *Response:* the endpoint resolves the token to a node, flattens the
+  typed readings onto reading columns, deduplicates on `(sensor_node, recorded_at)`, persists a
+  `SensorReading`, updates node `last_seen`/battery/`pump_state`, evaluates the low-moisture alert
+  rule, and returns `{command: {pump_mode, pump_on, dry_level, wet_level}}`.
 
 **Functional requirements:**
-- FR-02.1 The ingestion worker (`run_ingestion`, paho-mqtt) shall subscribe to the configured topic and
-  persist valid readings via `SensorReadingRepository`; ingestion is internal, not a public HTTP POST.
-- FR-02.2 Telemetry shall be persisted **only** for registered `device_id`s; unknown devices shall be
-  quarantined, logged, and shall raise a `system` alert to the admin.
-- FR-02.3 Malformed JSON or physically implausible values (e.g., negative moisture, temperature outside
-  DHT22 range) shall be dropped and logged without crashing the worker.
-- FR-02.4 Duplicate `(device_id, timestamp)` readings shall be skipped silently.
+- FR-02.1 Telemetry shall be accepted only over `POST /api/v1/iot/telemetry/` and only when the body's
+  `token` resolves to a node that is **claimed to a field**; otherwise `403`.
+- FR-02.2 A device shall register itself via `POST /api/v1/iot/announce/`, remaining tokenless until a
+  farmer claims it; the token shall be returned on the first announce after claiming, so no secret is
+  ever compiled into the firmware image.
+- FR-02.3 Malformed JSON or physically implausible values (e.g. moisture outside 0–100) shall be
+  rejected with `400`, logged, and shall never crash the endpoint.
+- FR-02.4 Duplicate `(sensor_node, recorded_at)` readings shall be skipped silently.
 - FR-02.5 Stored readings shall be immutable; long data gaps shall be flagged so dependent
   recommendations can be suppressed (BR-S3).
-- FR-02.6 During backend downtime the broker shall buffer messages; the worker shall drain them on
-  reconnect with no data loss.
+- FR-02.6 An unrecognised `sensor_type` shall be ignored rather than rejected, so a newer board never
+  fails against an older backend.
+- FR-02.7 During backend downtime the **device** shall retry on its next interval; with no broker in
+  the path, buffering is the node's responsibility.
 
-**Endpoints:** `run_ingestion` worker; read via `GET /sensor-readings`.
+**Endpoints:** `POST /iot/announce/`, `POST /iot/telemetry/`; read via `GET /sensor-readings`.
+Device management: `GET /sensor-nodes?claimed=`, `POST /sensor-nodes/{id}/{claim,release,pump,thresholds}`.
 
 ### 3.3 FR-03 — Monitoring Dashboard and Field Detail
 **Use cases:** UC-12, UC-13.
@@ -504,37 +511,40 @@ The UI conforms to `docs/DESIGN_SYSTEM.md`:
   text, Kinyarwanda default with English toggle.
 - **Components:** StatTile, SensorGauge, SensorTrendChart (green ramp), RecommendationCard (confidence
   bar), DiseaseUploadCard, AssistantChat (farmer bubbles `--green-50`, assistant white bordered, source
-  chips, streaming), AlertItem, OtpInput (6-cell), LanguageToggle, DataTable, EmptyState, Skeletons.
+  chips, streaming), AlertItem, OtpInput (6-cell, password reset), LanguageToggle, DataTable,
+  EmptyState, Skeletons, WeatherCard, device cards with pump control.
 - **Accessibility:** WCAG AA contrast, full keyboard navigation, visible focus, ARIA on interactive
   widgets, alt text on imagery, `prefers-reduced-motion` respected.
 - **Routes:** the App-Router routes listed per feature in §3 and in `FRONTEND_PROMPT.md`.
 
 ### 4.2 Hardware Interfaces
-- **ESP32-WROOM-32** sensor node (Wi-Fi, 3.3 V, battery/solar) running firmware that samples sensors and
-  publishes MQTT telemetry.
+- **ESP32-WROOM-32** sensor node (Wi-Fi, 3.3 V, battery/solar) running the firmware in
+  `firmware/agrimind_smart_farm/`: it self-provisions Wi-Fi over a captive portal, samples the
+  sensors, drives the pump relay, and POSTs telemetry over HTTPS.
 - **Capacitive soil-moisture sensor** (v1.2, 3.3–5 V, corrosion-resistant) — volumetric water content.
-- **DHT22** temperature/humidity sensor (−40…80 °C ±0.5 °C; 0–100 % RH ±2 %).
-- **Optional rain sensor** (resistive, digital + analog).
+- **7-in-1 RS485 soil probe** (Modbus RTU) — moisture, temperature, EC, pH, N, P, K.
+- **Relay-driven pump** (active-LOW), 20x4 I²C LCD, status LEDs and buzzer.
 - **Site gateway/router** (Wi-Fi with 4G/LTE uplink) providing internet connectivity for nodes and users.
-- Telemetry payload: JSON `{device_id, soil_moisture, temperature, humidity, rainfall}` on topic
-  `smartmurima/<device_id>/telemetry`.
+- Telemetry payload: JSON `{token, pump, readings:[{sensor_type, value, optimal_min, optimal_max}]}`
+  POSTed to `/api/v1/iot/telemetry/`; the response carries the pump command block.
 
 ### 4.3 Software Interfaces
-- **Ollama** (`http://ollama:11434`) — chat completion with `llama3.1:8b`; embeddings with
+- **Ollama** (`http://ollama:11434`) — chat completion with `qwen2.5:0.5b`; embeddings with
   `nomic-embed-text` (768-dim vectors).
 - **PostgreSQL + pgvector** — relational persistence and vector similarity search (cosine `<=>`) over
   `KnowledgeDocument.embedding VECTOR(768)` with an HNSW/IVF index.
 - **Weather API** (external) — forecast provider proxied and cached by the backend; optional (degrades
   gracefully when absent).
-- **MQTT broker** (Eclipse Mosquitto, `mqtt://mqtt:1883`) — publish/subscribe telemetry transport.
-- **SMS Gateway** — OTP delivery; console backend in development, pluggable provider in production.
+- **SMS Gateway** — password-reset code delivery; console backend in development, pluggable HTTP
+  provider in production.
 - **drf-spectacular** — OpenAPI schema and Swagger UI.
 
 ### 4.4 Communications Interfaces
 - **HTTPS/REST** — frontend ↔ backend over `/api/v1`, JSON payloads, JWT `Authorization: Bearer`,
   paginated list envelope `{count, next, previous, results}`, ISO-8601 timestamps, error envelope
   `{detail, code, errors}`; TLS terminated at Nginx.
-- **MQTT** — ESP32 nodes → Mosquitto → ingestion worker (QoS/retained per broker config); broker buffers
+- **Device HTTPS** — ESP32 nodes → `/api/v1/iot/` (announce + telemetry), authenticated by a
+  per-device token in the request body; the node retries
   during outages.
 - **SSE (Server-Sent Events)** — streamed assistant responses via `/assistant/chat/stream`, with client
   reconnect.
@@ -547,7 +557,7 @@ The UI conforms to `docs/DESIGN_SYSTEM.md`:
 
 | NFR | Requirement | Mechanism | Verified by |
 |---|---|---|---|
-| **NFR-1 Performance** | Typical page interactions < 3 s; sensor readings ingested in near real time. | Query indexes (e.g., `(node, recorded_at)`), pagination, TanStack Query cache, MQTT streaming. | Load test T-P1; ingestion latency T-P2. |
+| **NFR-1 Performance** | Typical page interactions < 3 s; sensor readings ingested in near real time. | Query indexes (e.g., `(node, recorded_at)`), pagination, TanStack Query cache, short-interval polling. | Load test T-P1; ingestion latency T-P2. |
 | **NFR-2 Scalability** | Accommodate growing farmers/cooperatives/nodes/readings without redesign. | Service-oriented, containerised, stateless API, horizontally scalable ingestion/ML services. | Architecture review; docker scale test. |
 | **NFR-3 Security** | Authenticated, role-based access; TLS in transit; hashed credentials; validated inputs; protection against common web vulnerabilities. | JWT + refresh rotation, hashed single-use OTP, role + object-level permissions, DRF validators, Nginx TLS. | T-A6 (401), T-A7 (RBAC 403), security review. |
 | **NFR-4 Usability** | Simple, visual, intuitive for low digital literacy. | Design system, `rw` default, icons + plain language, ≥44px targets, charts over text. | Acceptance sessions AT-1…AT-5. |

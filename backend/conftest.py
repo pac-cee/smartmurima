@@ -1,7 +1,7 @@
 """Global pytest configuration.
 
 Test settings (``config.settings.test``, selected in pytest.ini) use sqlite and
-stub out external services (PostgreSQL/Ollama/MQTT/ML artifacts), so the suite
+stub out external services (PostgreSQL/Ollama/ML artifacts), so the suite
 runs with no infrastructure.
 """
 import os

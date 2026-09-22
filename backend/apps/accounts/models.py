@@ -67,7 +67,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     language = models.CharField(
         max_length=2, choices=Language.choices, default=Language.KINYARWANDA
     )
-    is_active = models.BooleanField(default=False)  # activated via OTP verify
+    is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 

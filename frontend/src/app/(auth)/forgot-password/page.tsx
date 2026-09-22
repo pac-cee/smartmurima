@@ -10,7 +10,7 @@ import { OtpInput } from '@/components/OtpInput';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useConfirmReset, useRequestReset, useResendOtp } from '@/hooks/useAuth';
+import { useConfirmReset, useRequestReset } from '@/hooks/useAuth';
 
 export default function ForgotPasswordPage() {
   const t = useTranslations('auth');
@@ -18,7 +18,6 @@ export default function ForgotPasswordPage() {
   const router = useRouter();
   const request = useRequestReset();
   const confirm = useConfirmReset();
-  const resend = useResendOtp();
 
   const [step, setStep] = useState<'request' | 'confirm'>('request');
   const [identifier, setIdentifier] = useState('');
@@ -131,17 +130,7 @@ export default function ForgotPasswordPage() {
             ) : (
               <button
                 className="font-semibold text-green-700 hover:underline"
-                onClick={() =>
-                  resend.mutate(
-                    { identifier, purpose: 'reset' },
-                    {
-                      onSuccess: () => {
-                        toast.success(t('resent'));
-                        setSeconds(30);
-                      },
-                    },
-                  )
-                }
+                onClick={sendCode}
               >
                 {t('resend')}
               </button>

@@ -106,11 +106,10 @@ class WeatherService(BaseService):
         return (record.raw or {}).get("source") in _NEUTRAL_SOURCES
 
     def _result(self, records, source: str, stale: bool) -> dict:
-        return {
-            "forecast": [self._serialize(r) for r in records],
-            "source": source,
-            "stale": stale,
-        }
+        days = sorted(
+            (self._serialize(r) for r in records), key=lambda d: d["date"]
+        )
+        return {"days": days, "source": source, "stale": stale}
 
     @staticmethod
     def _serialize(r) -> dict:
@@ -119,9 +118,9 @@ class WeatherService(BaseService):
         # fallback forecast_date may still be a string rather than a date.
         fd = fd.isoformat() if hasattr(fd, "isoformat") else str(fd)
         return {
-            "forecast_date": fd,
-            "temperature_min": r.temperature_min,
-            "temperature_max": r.temperature_max,
+            "date": fd,
+            "temp_min": r.temperature_min,
+            "temp_max": r.temperature_max,
             "humidity": r.humidity,
             "rainfall_mm": r.rainfall_mm,
             "summary": r.summary,

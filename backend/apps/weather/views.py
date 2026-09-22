@@ -14,7 +14,7 @@ class WeatherForecastView(APIView):
 
     @extend_schema(
         parameters=[OpenApiParameter("farm", int, required=True)],
-        responses=WeatherForecastSerializer(many=True),
+        responses=WeatherForecastSerializer,
     )
     def get(self, request):
         farm_id = request.query_params.get("farm")

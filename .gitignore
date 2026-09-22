@@ -59,3 +59,6 @@ frontend/.env.local
 # ---------- Docker / data volumes ----------
 infra/**/data/
 *.pid
+
+# The firmware folder is tracked; the zip is a redundant copy of it.
+firmware/*.zip

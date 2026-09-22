@@ -1,27 +1,26 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useCallback, useSyncExternalStore } from 'react';
 import { api } from '@/lib/api';
 import {
   authResultSchema,
-  otpChallengeSchema,
+  resetChallengeSchema,
   userSchema,
   type AuthResult,
   type ChangePasswordInput,
   type LoginInput,
-  type OtpChallenge,
-  type OtpVerifyInput,
   type PasswordResetConfirmInput,
   type RegisterInput,
+  type ResetChallenge,
   type User,
 } from '@/lib/schemas';
 import { tokenStore } from '@/lib/token-store';
 
 /**
- * The OTP endpoints accept either `email` (validated as an email) or
- * `phone_number`. Sending a phone number in the `email` field would fail
+ * The password-reset endpoint accepts either `email` (validated as an email)
+ * or `phone_number`. Sending a phone number in the `email` field would fail
  * validation, so route the identifier to the correct field.
  */
 function identifierBody(identifier: string): { email: string } | { phone_number: string } {
@@ -42,6 +41,28 @@ export function useSession() {
   return { user, isAuthenticated };
 }
 
+/**
+ * The authoritative current user, re-read from the API.
+ *
+ * `useSession()` returns whatever was cached at sign-in, which goes stale the
+ * moment anything changes the account elsewhere (an admin edit, a second tab).
+ * Screens that *edit* the profile should read this and let it refresh the
+ * cached session, so they never render a stale value.
+ */
+export function useMe() {
+  const { isAuthenticated } = useSession();
+  return useQuery({
+    queryKey: ['me'],
+    queryFn: async () => {
+      const user = await api.get('/auth/me', userSchema);
+      tokenStore.setUser(user);
+      return user;
+    },
+    enabled: isAuthenticated,
+    staleTime: 60_000,
+  });
+}
+
 export function useLogin() {
   return useMutation<AuthResult, Error, LoginInput>({
     mutationFn: (input) => api.post('/auth/login', input, authResultSchema, { auth: false }),
@@ -51,50 +72,25 @@ export function useLogin() {
   });
 }
 
-// Registration uses OTP. `POST /auth/register` returns an OTP "challenge"
-// ({ identifier, purpose, expires_at, dev_code? }) and does NOT return tokens,
-// so no session is stored here. The page routes to /verify-otp, where the user
-// enters the code and `useVerifyOtp` establishes the session.
+// Sign-up is one step: `POST /auth/register` returns the same { user, tokens }
+// shape as login, so the session is established right here and the caller can
+// go straight to the dashboard. There is no verification screen.
 export function useRegister() {
-  return useMutation<OtpChallenge, Error, RegisterInput>({
-    mutationFn: (input) => api.post('/auth/register', input, otpChallengeSchema, { auth: false }),
-  });
-}
-
-export function useVerifyOtp() {
-  return useMutation<AuthResult, Error, OtpVerifyInput>({
-    mutationFn: ({ identifier, code }) =>
-      api.post(
-        '/auth/otp/verify',
-        { ...identifierBody(identifier), code },
-        authResultSchema,
-        { auth: false },
-      ),
+  return useMutation<AuthResult, Error, RegisterInput>({
+    mutationFn: (input) => api.post('/auth/register', input, authResultSchema, { auth: false }),
     onSuccess: (data) => {
       tokenStore.setSession(data.tokens.access, data.tokens.refresh, data.user);
     },
   });
 }
 
-export function useResendOtp() {
-  return useMutation<OtpChallenge, Error, { identifier: string; purpose: 'register' | 'login' | 'reset' }>({
-    mutationFn: (input) =>
-      api.post(
-        '/auth/otp/resend',
-        { ...identifierBody(input.identifier), purpose: input.purpose },
-        otpChallengeSchema,
-        { auth: false },
-      ),
-  });
-}
-
 export function useRequestReset() {
-  return useMutation<OtpChallenge, Error, string>({
+  return useMutation<ResetChallenge, Error, string>({
     mutationFn: (identifier) =>
       api.post(
         '/auth/password/reset/request',
         identifierBody(identifier),
-        otpChallengeSchema,
+        resetChallengeSchema,
         { auth: false },
       ),
   });

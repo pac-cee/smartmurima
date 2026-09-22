@@ -13,8 +13,6 @@ from .serializers import (
     AdminUserWriteSerializer,
     AuthResultSerializer,
     LoginSerializer,
-    OtpResendSerializer,
-    OtpVerifySerializer,
     PasswordChangeSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
@@ -38,48 +36,27 @@ def _issue_payload(result):
 
 
 class RegisterView(APIView):
+    """Single-step sign-up: create the account and return a live session.
+
+    There is no verification step -- the response carries the user plus a JWT
+    pair, exactly like ``/auth/login``, so the client lands on the dashboard.
+    """
+
     permission_classes = [AllowAny]
     throttle_scope = "auth"
 
-    @extend_schema(request=RegisterSerializer)
+    @extend_schema(request=RegisterSerializer, responses=AuthResultSerializer)
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         result = AuthService().register(serializer.validated_data)
-        return Response(_issue_payload(result), status=status.HTTP_201_CREATED)
-
-
-class OtpVerifyView(APIView):
-    permission_classes = [AllowAny]
-    throttle_scope = "otp"
-
-    @extend_schema(request=OtpVerifySerializer, responses=AuthResultSerializer)
-    def post(self, request):
-        serializer = OtpVerifySerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        result = AuthService().verify_registration(
-            serializer.identifier, serializer.validated_data["code"]
-        )
         return Response(
             {
                 "user": UserSerializer(result["user"]).data,
                 "tokens": result["tokens"],
-            }
+            },
+            status=status.HTTP_201_CREATED,
         )
-
-
-class OtpResendView(APIView):
-    permission_classes = [AllowAny]
-    throttle_scope = "otp"
-
-    @extend_schema(request=OtpResendSerializer)
-    def post(self, request):
-        serializer = OtpResendSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        result = AuthService().resend_otp(
-            serializer.identifier, serializer.validated_data["purpose"]
-        )
-        return Response(_issue_payload(result))
 
 
 class LoginView(APIView):

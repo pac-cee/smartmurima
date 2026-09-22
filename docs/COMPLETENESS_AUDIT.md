@@ -3,7 +3,7 @@
 Audits the backend against the dissertation requirements (Ch.4 §4.3 FR-01..10 + NFRs,
 §2.3.2 feature list, §4.5) as traced through `API_CONTRACT.md`, `USE_CASES.md`, and
 `TRACEABILITY_MATRIX.md`. This pass focused on four backend surfaces
-(`weather`, `reports`, `alerts`, and the OTP SMS production path) and closed the gaps
+(`weather`, `reports`, `alerts`, and the SMS production path) and closed the gaps
 found there. Verified with `python manage.py check` (clean, all external services absent).
 
 > Source note: the plain-text dissertation export named in the task was not present on
@@ -19,8 +19,8 @@ Legend: **Y** = implemented, **N** = absent, **Partial** = present but with a do
 
 | FR | Requirement | Impl | Where | Gaps I closed | Remaining notes |
 |---|---|---|---|---|---|
-| FR-01 | Registration, auth, RBAC, profiles, OTP | Y | `apps/accounts/{services,views,serializers,models}.py` | — (SMS prod path below) | Complete: hashed/single-use/TTL OTP, JWT + refresh, role + object perms. |
-| FR-02 | Sensor capture (MQTT→DB) | Y | `apps/sensors/services.py`, `iot/`, `run_ingestion` cmd | Provided importable `evaluate_low_moisture` for the ingestion low-moisture rule | Ingestion is a worker, not HTTP (by design). Dedup/validation/quarantine present. |
+| FR-01 | Registration, auth, RBAC, profiles | Y | `apps/accounts/{services,views,serializers,models}.py` | Registration reduced to a single step (no OTP gate) | Complete: JWT + refresh, role + object perms; hashed/single-use/TTL codes retained for password reset only. |
+| FR-02 | Sensor capture (HTTP→DB) | Y | `apps/sensors/{services,iot_views,iot_urls}.py`, `simulate_devices` cmd | Replaced the MQTT worker with token-authenticated HTTP endpoints; added pH/EC/NPK columns and the pump command block | Public endpoint authenticated per device. Dedup/validation/quarantine present. |
 | FR-03 | Monitoring dashboard data | Y | `apps/sensors` (`/sensor-readings*`), aggregation in repo | — | Latest-per-field + aggregated series present. |
 | FR-04 | Irrigation recommendation | Partial | `apps/recommendations/services.py`, `ml/` | — (out of scope) | Real model loads from `ml/artifacts`; **heuristic stub** when artifact absent (flagged `details.stub`). Dataset/trained model needed for production accuracy. |
 | FR-05 | Fertilizer recommendation | Partial | `apps/recommendations/services.py` | — | Same stub-fallback pattern as FR-04. |
@@ -40,7 +40,7 @@ Legend: **Y** = implemented, **N** = absent, **Partial** = present but with a do
 
 | Feature | Impl | Where | Gaps I closed | Remaining notes |
 |---|---|---|---|---|
-| Real-time IoT monitoring | Y | `apps/sensors`, `iot/`, MQTT ingestion worker | — | Broker buffering + dedup + implausible-value rejection. |
+| Real-time IoT monitoring | Y | `apps/sensors`, `/api/v1/iot/`, `/devices` UI | Device discovery, claiming and pump control | Device-side retry + dedup + implausible-value rejection. |
 | ML irrigation & fertilizer advisory | Partial | `apps/recommendations`, `ml/` | — | Deterministic **heuristic stubs** until trained artifacts are dropped in `ml/artifacts`. Never hard-fails. |
 | CNN crop-disease detection | Partial | `apps/diseases`, `ml/` | — | **Real CNN needs dataset + trained model**; TensorFlow disabled in requirements → stub classifier, low-confidence flagged. |
 | RAG assistant (RAB/MINAGRI grounded) | Partial | `apps/assistant`, `rag/` | — | Grounding + provenance + no-hallucination path complete; **LLM/embeddings are offline** (Ollama) and return `503` when the service is down. |
@@ -82,10 +82,10 @@ Legend: **Y** = implemented, **N** = absent, **Partial** = present but with a do
 > To adopt the clean seam, `apps/sensors/services.py` can switch its `_evaluate_low_moisture`
 > body to `from apps.alerts.services import evaluate_low_moisture; evaluate_low_moisture(owner, node.field, reading.soil_moisture)`.
 
-**OTP SMS production path (`apps/accounts/services.py`)** — FR-01
+**Reset-code SMS production path (`apps/accounts/services.py`)** — FR-01
 - Already present and correct: `HttpSmsGateway` (generic HTTP POST, bearer auth) selected by
   `get_sms_gateway()` when `SMS_PROVIDER` is set, else `ConsoleSmsGateway` (dev). Driven by
-  `SMS_PROVIDER`/`SMS_API_KEY`/`SMS_SENDER_ID`. OTP models/flow untouched. **No change needed.**
+  `SMS_PROVIDER`/`SMS_API_KEY`/`SMS_SENDER_ID`. Reset-code models/flow untouched. **No change needed.**
 
 ---
 
@@ -96,8 +96,8 @@ Every path in `API_CONTRACT.md` resolves to a registered route. **No missing or 
 | Contract path | In router? | Where |
 |---|---|---|
 | `POST /auth/register` | Y | `apps/accounts/urls.py` |
-| `POST /auth/otp/verify` | Y | `apps/accounts/urls.py` |
-| `POST /auth/otp/resend` | Y | `apps/accounts/urls.py` |
+| `POST /iot/announce/` | Y | `apps/sensors/iot_urls.py` |
+| `POST /iot/telemetry/` | Y | `apps/sensors/iot_urls.py` |
 | `POST /auth/login` | Y | `apps/accounts/urls.py` |
 | `POST /auth/token/refresh` | Y | `apps/accounts/urls.py` |
 | `POST /auth/password/reset/request` | Y | `apps/accounts/urls.py` |

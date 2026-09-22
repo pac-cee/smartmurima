@@ -67,14 +67,71 @@ class FieldSerializer(serializers.ModelSerializer):
 
 
 class SensorNodeSerializer(serializers.ModelSerializer):
+    """A field device as the app sees it.
+
+    ``token`` is never exposed here -- it only ever travels to the device
+    itself, in the announce response.
+    """
+
+    field_name = serializers.CharField(source="field.name", read_only=True)
+    farm_name = serializers.CharField(source="field.farm.name", read_only=True)
+    is_claimed = serializers.BooleanField(read_only=True)
+    is_online = serializers.BooleanField(read_only=True)
+
     class Meta:
         model = SensorNode
         fields = [
             "id",
             "field",
+            "field_name",
+            "farm_name",
             "device_id",
+            "hardware_id",
+            "name",
             "status",
             "battery",
             "last_seen",
+            "is_claimed",
+            "is_online",
+            "pump_mode",
+            "pump_on",
+            "pump_state",
+            "dry_level",
+            "wet_level",
         ]
-        read_only_fields = ["id"]
+        read_only_fields = [
+            "id",
+            "hardware_id",
+            "last_seen",
+            "is_claimed",
+            "is_online",
+            "pump_state",
+        ]
+        extra_kwargs = {"field": {"required": False, "allow_null": True}}
+
+
+class ClaimDeviceSerializer(serializers.Serializer):
+    """Body for POST /sensor-nodes/{id}/claim."""
+
+    field = serializers.PrimaryKeyRelatedField(queryset=Field.objects.all())
+
+
+class PumpCommandSerializer(serializers.Serializer):
+    """Body for POST /sensor-nodes/{id}/pump."""
+
+    pump_mode = serializers.ChoiceField(choices=["auto", "manual"])
+    pump_on = serializers.BooleanField(required=False)
+
+    def validate(self, attrs):
+        if attrs["pump_mode"] == "manual" and "pump_on" not in attrs:
+            raise serializers.ValidationError(
+                {"pump_on": ["Required when pump_mode is 'manual'."]}
+            )
+        return attrs
+
+
+class ThresholdSerializer(serializers.Serializer):
+    """Body for POST /sensor-nodes/{id}/thresholds."""
+
+    dry_level = serializers.IntegerField(min_value=0, max_value=100)
+    wet_level = serializers.IntegerField(min_value=0, max_value=100)

@@ -24,13 +24,13 @@ NFR-1…NFR-8) and use-case identifiers (UC-01…UC-30) and are mutually consist
 |---|---|
 | [use-case.md](./diagrams/use-case.md) | Use case diagram: all 30 use cases grouped by the 8 domains, with human and system actors (IoT Node, AI Engine, Weather API, SMS Gateway), across three readable views. |
 | [class.md](./diagrams/class.md) | Class diagram of the domain model (15 entities with attributes, methods, associations, multiplicities) plus the layered Repository/Service/View stereotypes. |
-| [component.md](./diagrams/component.md) | Component diagram: frontend, Nginx, backend, ingestion, ML service, AI Assistant/RAG, Ollama, PostgreSQL+pgvector, MQTT broker, Weather API, with dependency arrows and interfaces. |
-| [deployment.md](./diagrams/deployment.md) | Deployment diagram mapping components to Docker containers and hosts (field ESP32 nodes → gateway → MQTT; app server; DB node; Ollama/GPU host) per docker-compose. |
+| [component.md](./diagrams/component.md) | Component diagram: frontend, Nginx, backend, IoT endpoints, ML service, AI Assistant/RAG, Ollama, PostgreSQL+pgvector, Weather API, with dependency arrows and interfaces. |
+| [deployment.md](./diagrams/deployment.md) | Deployment diagram mapping components to Docker containers and hosts (field ESP32 nodes → gateway → HTTPS; app server; DB node; Ollama host) per docker-compose. |
 | [erd.md](./diagrams/erd.md) | Entity relationship diagram: all tables with PK/FK attributes and cardinalities, matching the data dictionary, including the pgvector embedding on knowledge_documents. |
 | [dfd.md](./diagrams/dfd.md) | Data flow diagrams: Level 0 context diagram and Level 1 process decomposition (users/auth, ingest, recommend, disease, RAG queries, alerts/reports). |
-| [activity.md](./diagrams/activity.md) | Activity diagrams with decision/exception branches for registration+OTP, irrigation recommendation, crop-disease detection, and RAG assistant query. |
-| [sequence.md](./diagrams/sequence.md) | Sequence diagrams for sensor→recommendation, RAG query, registration/OTP/login token issuance, and disease image upload→report. |
-| [state.md](./diagrams/state.md) | State diagrams (bonus) for the OtpCode lifecycle and the Recommendation and DiseaseReport statuses. |
+| [activity.md](./diagrams/activity.md) | Activity diagrams with decision/exception branches for registration, irrigation recommendation, crop-disease detection, and RAG assistant query. |
+| [sequence.md](./diagrams/sequence.md) | Sequence diagrams for device pairing + sensor→recommendation, RAG query, registration/login token issuance, password reset, and disease image upload→report. |
+| [state.md](./diagrams/state.md) | State diagrams (bonus) for the device pairing lifecycle, the password-reset code, and the Recommendation and DiseaseReport statuses. |
 
 ## Reading order
 

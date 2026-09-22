@@ -59,30 +59,31 @@ export const tokenPairSchema = z.object({
 });
 export type TokenPair = z.infer<typeof tokenPairSchema>;
 
-// Login and OTP-verify both return { user, tokens: { access, refresh } }.
+// Login and register both return { user, tokens: { access, refresh } }.
 export const authResultSchema = z.object({
   user: userSchema,
   tokens: tokenPairSchema,
 });
 export type AuthResult = z.infer<typeof authResultSchema>;
 
-// register / otp-resend / password-reset-request all return an OTP "challenge":
+// `POST /auth/password/reset/request` returns a reset "challenge":
 // { identifier, purpose, expires_at, detail?, dev_code? }. In development
-// (console SMS gateway) the backend also returns `dev_code`.
-export const otpChallengeSchema = z.object({
+// (console SMS gateway) the backend also returns `dev_code` so the reset can
+// be completed without a real SMS.
+export const resetChallengeSchema = z.object({
   identifier: z.string().optional(),
   purpose: z.string().optional(),
   expires_at: z.string().optional(),
   detail: z.string().optional(),
   dev_code: z.string().optional(),
 });
-export type OtpChallenge = z.infer<typeof otpChallengeSchema>;
+export type ResetChallenge = z.infer<typeof resetChallengeSchema>;
 
 // Self-registration is always a farmer account; the backend forces the role, so
 // the client never sends one. `roleSchema`/`Role` remain for the user model and
-// nav-item gating. `POST /auth/register` returns an OTP challenge (see
-// `otpChallengeSchema`), not tokens. At least one of email/phone must be
-// provided; both are otherwise optional.
+// nav-item gating. `POST /auth/register` is single-step: it returns the same
+// { user, tokens } shape as login, so the client is signed in straight away.
+// At least one of email/phone must be provided; both are otherwise optional.
 export const registerInput = z
   .object({
     full_name: z.string().min(2),
@@ -112,14 +113,6 @@ export const loginInput = z.object({
   password: z.string().min(1),
 });
 export type LoginInput = z.infer<typeof loginInput>;
-
-export const otpVerifyInput = z.object({
-  identifier: z.string(),
-  code: z.string().length(6),
-});
-export type OtpVerifyInput = z.infer<typeof otpVerifyInput>;
-
-export const otpPurpose = z.enum(['register', 'login', 'reset']);
 
 export const passwordResetConfirmInput = z.object({
   identifier: z.string(),
@@ -226,25 +219,47 @@ export const sensorNodeInput = z.object({
 });
 export type SensorNodeInput = z.infer<typeof sensorNodeInput>;
 
+export const pumpModeSchema = z.enum(['auto', 'manual']);
+export type PumpMode = z.infer<typeof pumpModeSchema>;
+
+// A field device. `field` is null while the board has announced itself but
+// nobody has claimed it yet -- that is the discovery state the Devices tab
+// lists first.
 export const sensorNodeSchema = z.object({
   id: idSchema,
-  field: idSchema,
-  field_name: z.string().optional(),
+  field: idSchema.nullable(),
+  field_name: z.string().nullable().optional(),
+  farm_name: z.string().nullable().optional(),
   device_id: z.string(),
+  hardware_id: z.string().nullable().optional(),
+  name: z.string().optional(),
   status: nodeStatusSchema,
   battery: z.number(),
   last_seen: z.string().nullable(),
+  is_claimed: z.boolean(),
+  is_online: z.boolean(),
+  pump_mode: pumpModeSchema,
+  pump_on: z.boolean().nullable(),
+  pump_state: z.boolean(),
+  dry_level: z.number(),
+  wet_level: z.number(),
 });
 export type SensorNode = z.infer<typeof sensorNodeSchema>;
 
 /* ---------- sensor readings ---------- */
+// Every channel except soil moisture is nullable: a given probe may not have
+// that sensor, and aggregate buckets come back null when nothing reported.
 export const sensorReadingSchema = z.object({
   soil_moisture: z.number(),
-  // Optional sensors: temperature/humidity/rainfall are nullable on the model,
-  // and aggregate buckets can also come back null.
   temperature: z.number().nullable(),
   humidity: z.number().nullable(),
   rainfall: z.number().nullable(),
+  ph: z.number().nullable().optional(),
+  ec: z.number().nullable().optional(),
+  nitrogen: z.number().nullable().optional(),
+  phosphorus: z.number().nullable().optional(),
+  potassium: z.number().nullable().optional(),
+  device_id: z.string().optional(),
   recorded_at: z.string(),
 });
 export type SensorReading = z.infer<typeof sensorReadingSchema>;
@@ -361,43 +376,93 @@ export const alertSchema = z.object({
 });
 export type Alert = z.infer<typeof alertSchema>;
 
-/* ---------- reports ---------- */
+/* ---------- reports ----------
+ * Mirrors ReportService.summary(). Every aggregate is nullable: a farm with no
+ * telemetry in the range is a normal, renderable state, not an error.
+ */
+const nullableNumber = z.number().nullable();
+
+export const reportSeriesPointSchema = z.object({
+  date: z.string(),
+  soil_moisture: nullableNumber,
+  temperature: nullableNumber,
+  humidity: nullableNumber,
+  rainfall: nullableNumber,
+  reading_count: z.number(),
+});
+export type ReportSeriesPoint = z.infer<typeof reportSeriesPointSchema>;
+
+// Generic {label,count} slice, used by the moisture-band and crop-health pies.
+export const reportSliceSchema = z.object({
+  label: z.string(),
+  count: z.number(),
+});
+export type ReportSlice = z.infer<typeof reportSliceSchema>;
+
+export const reportPerFieldSchema = z.object({
+  field: idSchema,
+  name: z.string(),
+  crop: z.string().nullable(),
+  avg_soil_moisture: nullableNumber,
+  avg_temperature: nullableNumber,
+  reading_count: z.number(),
+});
+export type ReportPerField = z.infer<typeof reportPerFieldSchema>;
+
 export const reportSummarySchema = z.object({
-  farm: idSchema,
-  farm_name: z.string().optional(),
-  from: z.string(),
-  to: z.string(),
-  avg_soil_moisture: z.number(),
-  avg_temperature: z.number(),
-  avg_humidity: z.number(),
-  total_rainfall: z.number(),
-  recommendations_count: z.number(),
-  disease_scans: z.number(),
-  alerts_count: z.number(),
-  yield_estimate: z.number(),
-  series: z.array(
-    z.object({
-      date: z.string(),
-      soil_moisture: z.number(),
-      temperature: z.number(),
-      rainfall: z.number(),
-    }),
-  ),
+  farm: idSchema.nullable(),
+  field_count: z.number(),
+  recommendation_count: z.number(),
+  recommendations_by_type: z.record(z.number()),
+  readings: z.object({
+    avg_soil_moisture: nullableNumber,
+    avg_temperature: nullableNumber,
+    avg_humidity: nullableNumber,
+    min_soil_moisture: nullableNumber,
+    max_soil_moisture: nullableNumber,
+    reading_count: z.number(),
+  }),
+  disease_reports: z.object({
+    total: z.number(),
+    unhealthy: z.number(),
+  }),
+  yield: z
+    .object({
+      decision: z.string(),
+      value: nullableNumber,
+      unit: z.string(),
+      confidence: nullableNumber,
+      created_at: z.string(),
+    })
+    .nullable(),
+  series: z.array(reportSeriesPointSchema),
+  moisture_distribution: z.array(reportSliceSchema),
+  advice_breakdown: z.array(z.object({ type: z.string(), count: z.number() })),
+  health_breakdown: z.array(reportSliceSchema),
+  per_field: z.array(reportPerFieldSchema),
+  empty: z.boolean(),
+  generated_at: z.string(),
 });
 export type ReportSummary = z.infer<typeof reportSummarySchema>;
 
 /* ---------- weather ---------- */
 export const weatherDaySchema = z.object({
   date: z.string(),
-  temp_min: z.number(),
-  temp_max: z.number(),
-  humidity: z.number(),
-  rainfall_mm: z.number(),
+  temp_min: z.number().nullable(),
+  temp_max: z.number().nullable(),
+  humidity: z.number().nullable(),
+  rainfall_mm: z.number().nullable(),
   summary: z.string(),
 });
+export type WeatherDay = z.infer<typeof weatherDaySchema>;
 export const weatherForecastSchema = z.object({
   farm: idSchema,
   days: z.array(weatherDaySchema),
+  // Where the forecast came from: a live provider call, a cached/last-known
+  // record, or the neutral offline estimate. `stale` drives the "estimated"
+  // badge so an offline outlook is never shown as a real forecast.
+  source: z.enum(['live', 'cache', 'last_known', 'neutral']).optional(),
+  stale: z.boolean().optional(),
 });
 export type WeatherForecast = z.infer<typeof weatherForecastSchema>;
 

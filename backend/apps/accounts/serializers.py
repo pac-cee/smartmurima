@@ -80,42 +80,6 @@ class ProfileUpdateSerializer(serializers.Serializer):
     )
 
 
-class OtpVerifySerializer(serializers.Serializer):
-    phone_number = serializers.CharField(required=False, allow_blank=True)
-    email = serializers.EmailField(required=False, allow_blank=True)
-    code = serializers.CharField(max_length=12)
-
-    def validate(self, attrs):
-        if not attrs.get("phone_number") and not attrs.get("email"):
-            raise serializers.ValidationError("Provide a phone_number or email.")
-        return attrs
-
-    @property
-    def identifier(self):
-        return self.validated_data.get("phone_number") or self.validated_data.get(
-            "email"
-        )
-
-
-class OtpResendSerializer(serializers.Serializer):
-    phone_number = serializers.CharField(required=False, allow_blank=True)
-    email = serializers.EmailField(required=False, allow_blank=True)
-    purpose = serializers.ChoiceField(
-        choices=["register", "login", "reset"], default="register"
-    )
-
-    def validate(self, attrs):
-        if not attrs.get("phone_number") and not attrs.get("email"):
-            raise serializers.ValidationError("Provide a phone_number or email.")
-        return attrs
-
-    @property
-    def identifier(self):
-        return self.validated_data.get("phone_number") or self.validated_data.get(
-            "email"
-        )
-
-
 class LoginSerializer(serializers.Serializer):
     identifier = serializers.CharField()
     password = serializers.CharField(write_only=True)

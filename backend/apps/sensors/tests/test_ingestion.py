@@ -1,4 +1,4 @@
-"""UT-01/UT-02 and IT-03: SensorReading ingestion via the MQTT service path."""
+"""UT-01/UT-02 and IT-03: SensorReading ingestion through IngestionService."""
 import pytest
 from django.utils import timezone
 

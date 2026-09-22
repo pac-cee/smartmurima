@@ -23,6 +23,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { OnboardingPanel } from '@/components/OnboardingPanel';
 import { SensorStatus } from '@/components/SensorStatus';
 import { SensorTrendChart } from '@/components/SensorTrendChart';
+import { WeatherCard } from '@/components/WeatherCard';
 import { useSelection } from '@/components/selection-context';
 import { ListSkeleton, StatRowSkeleton } from '@/components/Skeletons';
 import { StatTile } from '@/components/StatTile';
@@ -187,6 +188,9 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Short-range outlook for the selected farm. */}
+      <WeatherCard farmId={activeFarm ?? undefined} />
 
       {/* Disease strip */}
       <Card>

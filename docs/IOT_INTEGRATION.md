@@ -1,205 +1,182 @@
-# SmartMurima — IoT Integration (ESP32 → MQTT → DB → REST → Frontend)
+# SmartMurima — IoT Integration (ESP32 → HTTP → DB → REST → Frontend)
 
-This document describes the end-to-end live telemetry path: how a field sensor
-node publishes a reading, how the backend ingests and stores it, how the REST
-API exposes it, and how the browser renders it live.
+How a field node gets paired, how a reading travels from the soil to the
+dashboard, and how a farmer's pump command travels back.
+
+There is **no message broker**. A device speaks plain HTTP JSON to two
+endpoints, which is all an ESP32 needs and one less service to run, secure and
+explain. The firmware in `firmware/agrimind_smart_farm/` is the reference
+client; `manage.py simulate_devices` is a software node that speaks the exact
+same protocol.
 
 ## 1. The full path
 
 ```
- ESP32 node / simulator                Broker            Django backend                 Browser (Next.js)
-┌───────────────────────┐   MQTT   ┌───────────┐   sub  ┌────────────────────────┐  REST  ┌──────────────────────┐
-│ soil / temp / humidity │ ───────▶ │ Mosquitto │ ─────▶ │ run_ingestion worker   │        │ TanStack Query polls │
-│ rainfall sensors       │  publish │  :1883    │ topic  │  → IngestionService    │        │  every ~8s           │
-│ publish every 5–60s    │          │           │ +/tel. │  → SensorReading (DB)  │ ◀────  │  dashboard + field   │
-└───────────────────────┘          └───────────┘        │  → node.last_seen      │  GET   │  KPIs / gauges /     │
-                                                         │  → low-moisture alert  │  JSON  │  trend + live badge  │
-                                                         └────────────────────────┘        └──────────────────────┘
+ ESP32 node / simulator                 Django backend                     Browser (Next.js)
+┌────────────────────────┐  HTTPS  ┌──────────────────────────┐   REST  ┌────────────────────────┐
+│ RS485 soil probe:      │ ──────▶ │ POST /iot/telemetry/     │         │ TanStack Query polls   │
+│ moisture, temp, pH,    │  every  │  → token → SensorNode    │         │  every ~6-8s           │
+│ EC, N, P, K            │  5-60s  │  → SensorReading (DB)    │ ◀────── │  dashboard · sensors   │
+│ + pump state           │         │  → node.last_seen        │  GET    │  devices · gauges      │
+│                        │ ◀────── │  → low-moisture alert    │  JSON   │                        │
+│ applies {command}      │  200 OK │  ← {command} pump block  │         │ POST pump override ───▶│
+└────────────────────────┘         └──────────────────────────┘         └────────────────────────┘
 ```
 
-Nothing in the browser speaks MQTT. The browser only calls the REST API; the
-MQTT→DB half is a server-side background worker. "Live" on the frontend means
-**short-interval polling of the REST API**, which reads the rows the ingestion
-worker is continuously writing.
+"Live" in the browser means **short-interval polling of the REST API**, reading
+rows the telemetry endpoint is continuously writing. The browser never talks to
+a device directly.
 
-## 2. MQTT topic & payload
+## 2. Pairing: a board nobody configured
 
-- **Broker:** Mosquitto, `mqtt://<host>:1883` (docker-compose service `mqtt`).
-- **Topic:** `smartmurima/<device_id>/telemetry`
-- **Worker subscription:** `smartmurima/+/telemetry` (`MQTT_TOPIC`, wildcard over all devices).
-- **Payload (JSON):**
+A fresh board has no token. It cannot post readings, and that is the point — an
+unauthenticated device must not be able to write into a farmer's field.
+
+```
+1. Board boots, joins Wi-Fi via its own captive portal (no hard-coded SSID).
+2. Board  ──▶ POST /iot/announce/   {"hardware_id": "ESP32-A1B2C3", "name": "AgriMind-C3"}
+   Backend ◀──                      {"status": "pending", "device_id": "SM-A1B2C3"}
+   It now appears under Devices → Discovered in the app. No token issued yet.
+
+3. Farmer ──▶ POST /sensor-nodes/{id}/claim   {"field": 11}
+   Backend mints a random token and attaches the device to that field.
+
+4. Board  ──▶ POST /iot/announce/   (same body, next heartbeat)
+   Backend ◀──                      {"status": "claimed", "token": "uU_N9S-..."}
+   The board saves the token to flash and starts sending telemetry.
+```
+
+No re-flashing, no copy-pasted secrets. Unpairing (`POST
+/sensor-nodes/{id}/release`) revokes the token and returns the board to the
+discovery list.
+
+## 3. Telemetry
+
+`POST /api/v1/iot/telemetry/` — no auth header; the body's `token` is the
+credential.
 
 ```json
 {
-  "device_id": "node-bugesera-01",
-  "soil_moisture": 34.2,
-  "temperature": 27.4,
-  "humidity": 61.0,
-  "rainfall": 0.0,
-  "ts": "2026-07-29T09:15:00Z"
+  "token": "uU_N9S-I45m46BrZF6cTTJdifAu0K3ggJCL-6Zt72pc",
+  "pump": false,
+  "readings": [
+    {"sensor_type": "moisture",   "value": 31.2,  "optimal_min": 40.0, "optimal_max": 65.0},
+    {"sensor_type": "temperature","value": 24.6,  "optimal_min": 18.0, "optimal_max": 30.0},
+    {"sensor_type": "ph",         "value": 6.41,  "optimal_min": 6.0,  "optimal_max": 7.0},
+    {"sensor_type": "ec",         "value": 1.204, "optimal_min": 0.8,  "optimal_max": 1.6},
+    {"sensor_type": "nitrogen",   "value": 47,    "optimal_min": 30.0, "optimal_max": 60.0},
+    {"sensor_type": "phosphorus", "value": 29,    "optimal_min": 20.0, "optimal_max": 40.0},
+    {"sensor_type": "potassium",  "value": 131,   "optimal_min": 100.0,"optimal_max": 160.0}
+  ]
 }
 ```
 
-Field notes:
-- `device_id` — required. If omitted from the body, the worker falls back to the
-  device id embedded in the topic (`smartmurima/<device_id>/telemetry`).
-- `soil_moisture` — required, `0–100` (% VWC). Out-of-range or missing → payload rejected.
-- `temperature`, `humidity`, `rainfall` — optional (nullable in the DB).
-- `ts` — optional ISO-8601 timestamp. Also accepts `timestamp` / `recorded_at`.
-  If absent, the server uses receive time. Dedup key is `(device_id, timestamp)`.
+Recognised `sensor_type` values map to `SensorReading` columns:
 
-## 3. Sources: firmware & simulator
+| `sensor_type` | Column | Unit |
+|---|---|---|
+| `moisture` (or `soil_moisture`) | `soil_moisture` | % VWC — **required** |
+| `temperature` | `temperature` | °C |
+| `humidity` | `humidity` | % |
+| `rainfall` | `rainfall` | mm |
+| `ph` | `ph` | pH |
+| `ec` | `ec` | mS/cm |
+| `nitrogen` / `phosphorus` / `potassium` | `nitrogen` / `phosphorus` / `potassium` | mg/kg |
 
-Both live in `iot/`.
+An unknown `sensor_type` is **ignored, not rejected** — a newer board must never
+fail against an older backend. Every channel except soil moisture is optional
+and stored as `NULL` when absent (the RS485 probe has no air-humidity channel,
+so `humidity` stays null rather than a fake `0`).
 
-- **Firmware — `iot/firmware/smartmurima_node/smartmurima_node.ino`**
-  Arduino sketch for an **ESP32-WROOM-32**: capacitive soil-moisture sensor
-  (GPIO34), DHT22 temperature/humidity (GPIO4), optional rain sensor (GPIO35).
-  Set Wi-Fi SSID/password, the broker IP, and a unique `DEVICE_ID`
-  (`node-bugesera-01`…), calibrate `SOIL_DRY_RAW`/`SOIL_WET_RAW`, and flash via
-  the Arduino IDE (libraries: PubSubClient, DHT sensor library + Adafruit
-  Unified Sensor, ArduinoJson). Publishes to `smartmurima/<DEVICE_ID>/telemetry`
-  every 60 s.
+Readings are de-duplicated on `(sensor_node, recorded_at)`, so a retry after a
+flaky connection cannot double-count.
 
-- **Simulator — `iot/simulator/simulate_nodes.py`** (no hardware needed)
-  Publishes realistic Bugesera-like readings for N virtual nodes named
-  `node-bugesera-01..0N`:
+### Responses
 
-  ```bash
-  pip install paho-mqtt
-  python iot/simulator/simulate_nodes.py --host localhost --port 1883 --nodes 3 --interval 5
-  ```
+| Status | Meaning |
+|---|---|
+| `200` | Stored. Body carries the `command` block below. |
+| `400` | Malformed body, or soil moisture missing/out of 0–100. |
+| `403` | Unknown token, or the device is not claimed to a field. |
 
-## 4. Device → field mapping (seed)
+## 4. The command block — control flowing back
 
-A `SensorNode.device_id` is the join key between the physical/simulated device
-and a farmer's field. The demo seed (`backend/apps/farms/management/commands/seed_demo.py`)
-registers three nodes whose ids **match the simulator/firmware exactly**:
+Every telemetry response carries the device's current orders. This is how a tap
+in the app reaches a pump in a field, without the backend ever needing to
+connect *to* the device (which sits behind a home router with no public IP).
 
-| device_id          | Field       | Farm                | Crop  |
-|--------------------|-------------|---------------------|-------|
-| `node-bugesera-01` | North Plot  | Bugesera Demo Farm  | Maize |
-| `node-bugesera-02` | South Plot  | Bugesera Demo Farm  | Beans |
-| `node-bugesera-03` | East Plot   | Bugesera Demo Farm  | Maize |
-
-All three belong to the demo `farmer` (`farmer@smartmurima.rw`, password
-`Demo1234!`). Register more nodes at runtime via `POST /api/v1/sensor-nodes`
-`{field, device_id, status, battery}` — unknown device ids are logged and
-skipped by the ingestion worker until a node exists.
-
-## 5. Backend ingestion
-
-- **Worker:** `python manage.py run_ingestion`
-  (`backend/apps/sensors/management/commands/run_ingestion.py`, docker service
-  `ingestion`). Subscribes to `MQTT_TOPIC` and drives `IngestionService`.
-- **Subscriber:** `backend/iot/mqtt_subscriber.py` — decodes JSON, injects the
-  topic's device id when needed, and never lets a bad message kill the loop
-  (malformed JSON is logged and dropped).
-- **Service:** `backend/apps/sensors/services.py::IngestionService.ingest()`
-  1. Validates the payload (required/typed/ranged `soil_moisture`, parsed timestamp).
-  2. Looks up `SensorNode` by `device_id`. **Unknown device → logged & skipped.**
-  3. **Dedups** on `(sensor_node, recorded_at)` (unique constraint + explicit check).
-  4. Persists a `SensorReading` linked to the node's field.
-  5. Updates `node.last_seen` (and `battery` if provided).
-  6. Fires the **low-moisture alert** rule when `soil_moisture < 20%`.
-  The worker catches `NotFoundError` / `ValidationError` / anything else so it
-  runs forever.
-
-## 6. REST API (what the browser reads)
-
-Base URL `NEXT_PUBLIC_API_URL` (`http://localhost:8000/api/v1`). JWT auth. All
-list endpoints are paginated `{ count, next, previous, results }`.
-
-- `GET /sensor-readings?field=&node=&from=&to=&agg=hourly|daily`
-  → paginated `SensorReading`:
-  `{ id, sensor_node, soil_moisture, temperature, humidity, rainfall, recorded_at }`
-  (with `agg`, buckets are averaged; rainfall summed).
-- `GET /sensor-readings/latest?field=<id>` → the newest reading for the field, or
-  `null` when the field has no telemetry yet.
-- `GET /sensor-nodes` → node roster incl. `status`, `battery`, `last_seen`
-  (drives the offline / last-seen UI).
-
-Timestamps are ISO-8601. Integer PKs serialize as JSON numbers and DecimalFields
-as strings; the frontend Zod schemas coerce these (`z.coerce`) so the backend
-stays the source of truth.
-
-## 7. How the frontend consumes it (live)
-
-- **Client:** `frontend/src/lib/api.ts` — typed fetch client, base
-  `NEXT_PUBLIC_API_URL`, JWT + refresh interceptor. Responses are validated with
-  Zod schemas (`frontend/src/lib/schemas.ts`).
-- **Mocks off by default:** MSW only starts when
-  `NEXT_PUBLIC_API_MOCKING === 'enabled'` (`frontend/src/app/providers.tsx`).
-  With it `disabled`, every request hits the real backend.
-- **Live polling (TanStack Query `refetchInterval`, ~8 s):**
-  - `useLatestReading(fieldId)` → dashboard KPI tiles + field-detail gauges.
-  - `useSensorReadings(fieldId, agg)` → dashboard & field-detail trend chart.
-  So a reading the simulator publishes appears within a few seconds without a
-  page reload.
-- **Sensor status:** `frontend/src/components/SensorStatus.tsx` shows a live green
-  pulse + "Live · Xm ago" when the latest reading is within 3 minutes, otherwise
-  "Offline · <last seen>", and "No sensor data" when a field has none.
-- **Auth to reach the data:** register → OTP verify → login, against the real
-  `/auth/*` endpoints. Login and OTP-verify return `{ user, tokens: {access,
-  refresh} }`. **Dev OTP:** with the console SMS gateway the backend returns a
-  `dev_code` on register / resend / reset; the frontend forwards it to the verify
-  screen and shows it (and prefills the input) in dev, so no server-log reading is
-  needed. In production (real SMS gateway) `dev_code` is absent and the code is
-  delivered by SMS.
-
-### Short answer: "how does the frontend connect to IoT?"
-
-It doesn't connect to MQTT at all. The ESP32/simulator publish over MQTT to the
-broker; a backend worker (`run_ingestion`) subscribes, writes each reading to the
-database, and updates the node's `last_seen`. The Next.js app then **polls the
-REST API every ~8 seconds** (`GET /sensor-readings/latest` and
-`GET /sensor-readings`) and re-renders the KPIs, gauges, trend chart, and
-online/last-seen badge — so the browser sees IoT data live via the database and
-HTTP, never via a direct device connection.
-
-## 8. Run it
-
-### A) Docker (everything wired)
-
-```bash
-# from repo root — starts db, mqtt, backend, ingestion worker, frontend (mocks off)
-docker compose up -d --build
-
-# seed the demo farmer/farm/fields + node-bugesera-01/02/03
-docker compose exec backend python manage.py seed_demo
-
-# stream live telemetry from the host into the broker
-pip install paho-mqtt
-python iot/simulator/simulate_nodes.py --host localhost --port 1883 --nodes 3 --interval 5
+```json
+{"command": {"pump_mode": "auto", "pump_on": null, "dry_level": 40, "wet_level": 65}}
 ```
 
-Open http://localhost:3000, sign in as `farmer@smartmurima.rw` / `Demo1234!`
-(seeded, already active), and watch the dashboard/field pages update live.
+| Field | Meaning |
+|---|---|
+| `pump_mode` | `auto` — the device decides from soil moisture; `manual` — obey `pump_on`. |
+| `pump_on` | `true`/`false` in manual mode. **`null` in auto mode**: the device's signal to fall back to its own thresholds. |
+| `dry_level` | Turn the pump **on** below this soil moisture %. |
+| `wet_level` | Turn the pump **off** above it. The gap is hysteresis — it stops the relay chattering around one setpoint. |
 
-### B) Local (manual processes)
+Latency is one telemetry interval (5 s on the reference firmware). The app
+therefore tracks two separate things: `pump_mode`/`pump_on` (what we
+**commanded**) and `pump_state` (what the device last **reported**), so an
+override that has not landed yet is visible rather than silently assumed.
+
+Farmer-facing control endpoints (JWT-authenticated, owner-scoped):
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /sensor-nodes/{id}/claim` `{field}` | Pair a discovered device to a section. |
+| `POST /sensor-nodes/{id}/release` | Unpair; revokes the token. |
+| `POST /sensor-nodes/{id}/pump` `{pump_mode, pump_on?}` | Force on/off, or hand control back to auto. |
+| `POST /sensor-nodes/{id}/thresholds` `{dry_level, wet_level}` | Re-tune the irrigation band (`dry < wet` enforced). |
+| `GET /sensor-nodes?claimed=false` | The discovery list. |
+
+## 5. Running without hardware
+
+`simulate_devices` is a real client, not a backend shortcut: it POSTs to the
+same public endpoint, parses the same command block, and runs the same pump
+hysteresis. Whatever it exercises, a real board exercises identically.
 
 ```bash
-# 1. broker
-docker compose up -d mqtt db
+# Alongside the stack (uses the seeded dev tokens):
+docker compose --profile iot up -d simulator
+docker compose logs -f simulator
 
-# 2. backend (in backend/, venv with requirements installed)
-python manage.py migrate
-python manage.py seed_demo
-python manage.py runserver 0.0.0.0:8000
-
-# 3. ingestion worker (separate shell, same venv)
-python manage.py run_ingestion            # subscribes smartmurima/+/telemetry
-
-# 4. frontend (in frontend/) — mocks off so it hits the real API
-#    frontend/.env.local: NEXT_PUBLIC_API_MOCKING=disabled
-pnpm install && pnpm dev
-
-# 5. telemetry
-python ../iot/simulator/simulate_nodes.py --host localhost --port 1883 --nodes 3 --interval 5
+# Or one-off / against a device you claimed yourself:
+docker compose exec backend python manage.py simulate_devices --once
+docker compose exec backend python manage.py simulate_devices --token <tok> --interval 5
 ```
 
-Verify the pipeline:
-- `run_ingestion` logs `Ingested reading node=… soil=…` per accepted message.
-- `GET /api/v1/sensor-readings/latest?field=<id>` (with a Bearer token) returns
-  the newest values; the numbers climb/drift as the simulator runs.
-- The dashboard "Live" badge stays green and KPI/gauge values move every few seconds.
+The seeded nodes `SM-NODE-01` / `SM-NODE-02` ship with fixed dev tokens
+(`dev-token-sm-node-01` / `-02`) purely so this works on a fresh database. Real
+boards always get a random token minted at claim time.
+
+## 6. Storage & side effects
+
+Each accepted reading:
+
+1. Inserts a `SensorReading` row (deduped on node + timestamp).
+2. Updates `SensorNode.last_seen`, which drives the live/offline badge
+   (`is_online` = reported within 60 s).
+3. Records `pump_state` when the device's reported state changed.
+4. Raises a **low-moisture alert** when soil moisture drops below 20 % — and a
+   failure here is logged, never allowed to reject the reading.
+
+## 7. Reading it back
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /sensor-readings/latest?field=` | Newest reading, or `null` if the field has none. |
+| `GET /sensor-readings?field=&from=&to=` | Paginated history. |
+| `GET /sensor-readings?field=&agg=hourly\|daily` | Bucketed averages (rainfall is summed). |
+
+## 8. Troubleshooting
+
+| Symptom | Cause |
+|---|---|
+| Device never appears under Discovered | Wrong backend URL. `localhost` in the firmware means the ESP32 itself — use the LAN IP of the Docker host. |
+| Serial shows `announce -> HTTP 000` | Not on Wi-Fi, or the host's port 8000 is firewalled. |
+| Announce returns `pending` forever | Nobody has claimed it yet. Devices → Discovered → pick a section → Pair. |
+| Telemetry returns `403` | Token revoked by an unpair, or the device was never claimed. It re-pairs automatically on the next announce. |
+| Readings land but the section looks empty | The device is claimed to a *different* section than the one selected in the top bar. |
+| ESP32 will not join the Wi-Fi | It is 2.4 GHz only — pick the `-2G` SSID. |

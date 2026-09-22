@@ -43,17 +43,16 @@ export default function RegisterPage() {
       ...(values.phone_number ? { phone_number: values.phone_number } : {}),
       ...(location ? { location } : {}),
     };
-    // The identifier the user will verify: prefer email, fall back to phone.
-    const identifier = values.email || values.phone_number || '';
     signup.mutate(payload, {
-      // Registration returns an OTP challenge (no tokens). Route to /verify-otp
-      // with the identifier so the user can enter the code and sign in there.
-      onSuccess: (challenge) => {
-        const query = new URLSearchParams({ identifier, purpose: 'register' });
-        if (challenge.dev_code) query.set('dev_code', challenge.dev_code);
-        router.push(`/verify-otp?${query.toString()}`);
+      // Registration already returns a session, so there is nothing to verify:
+      // land the new farmer on the dashboard.
+      onSuccess: (result) => {
+        toast.success(`Welcome, ${result.user.full_name}.`);
+        router.replace('/dashboard');
       },
-      onError: () => toast.error('Could not create your account. Try again.'),
+      // Surface the backend's own message ("this email already exists", a
+      // password that failed validation, ...) instead of a generic retry.
+      onError: (error) => toast.error(error.message || 'Could not create your account.'),
     });
   };
 

@@ -1,4 +1,4 @@
-"""IT-02: register -> OTP verify -> tokens; and IT-01: JWT-protected 401."""
+"""IT-02: single-step register -> tokens; and IT-01: JWT-protected 401."""
 import pytest
 from rest_framework.test import APIClient
 
@@ -16,39 +16,61 @@ def test_protected_endpoint_requires_jwt(db, client):
     assert resp.status_code == 401
 
 
-def test_register_verify_returns_tokens(db, client):
+def test_register_returns_an_active_session(db, client):
+    """Registration is one step: the response already carries a usable JWT."""
     resp = client.post(
         "/api/v1/auth/register",
         {
             "full_name": "Bob Farmer",
             "phone_number": "+250780000020",
             "password": "StrongPass1",
-            "role": "farmer",
             "language": "rw",
         },
         format="json",
     )
     assert resp.status_code == 201, resp.content
-    dev_code = resp.data["dev_code"]  # console gateway exposes the code in dev
+    assert "access" in resp.data["tokens"]
+    assert "refresh" in resp.data["tokens"]
+    assert resp.data["user"]["full_name"] == "Bob Farmer"
+    assert resp.data["user"]["role"] == "farmer"
 
     user = User.objects.get(phone_number="+250780000020")
-    assert user.is_active is False  # inactive until verified
+    assert user.is_active is True  # no verification step to wait on
+    assert user.farmer_profile is not None
 
-    verify = client.post(
-        "/api/v1/auth/otp/verify",
-        {"phone_number": "+250780000020", "code": dev_code},
-        format="json",
-    )
-    assert verify.status_code == 200, verify.content
-    assert "access" in verify.data["tokens"]
-    assert "refresh" in verify.data["tokens"]
-
-    user.refresh_from_db()
-    assert user.is_active is True
-
-    # Authenticated request now succeeds.
-    token = verify.data["tokens"]["access"]
-    client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+    # The token works immediately -- no second round-trip.
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {resp.data['tokens']['access']}")
     me = client.get("/api/v1/auth/me")
     assert me.status_code == 200
     assert me.data["full_name"] == "Bob Farmer"
+
+
+def test_register_then_login_with_the_same_credentials(db, client):
+    """Regression: a freshly registered account can sign in right away."""
+    client.post(
+        "/api/v1/auth/register",
+        {
+            "full_name": "Claudine U",
+            "email": "claudine@example.rw",
+            "password": "StrongPass1",
+        },
+        format="json",
+    )
+    login = client.post(
+        "/api/v1/auth/login",
+        {"identifier": "claudine@example.rw", "password": "StrongPass1"},
+        format="json",
+    )
+    assert login.status_code == 200, login.content
+    assert "access" in login.data["tokens"]
+
+
+def test_register_rejects_a_duplicate_email(db, client):
+    payload = {
+        "full_name": "Dup",
+        "email": "dup@example.rw",
+        "password": "StrongPass1",
+    }
+    assert client.post("/api/v1/auth/register", payload, format="json").status_code == 201
+    second = client.post("/api/v1/auth/register", payload, format="json")
+    assert second.status_code == 409, second.content

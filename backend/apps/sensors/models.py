@@ -12,6 +12,16 @@ class SensorReading(models.Model):
     temperature = models.FloatField(null=True, blank=True)
     humidity = models.FloatField(null=True, blank=True)
     rainfall = models.FloatField(null=True, blank=True)
+    # Soil chemistry straight off the RS485 probe. All nullable: a cheap
+    # moisture-only node sends none of them, and a partial reading is still
+    # worth storing.
+    ph = models.FloatField(null=True, blank=True, help_text="Soil pH (0-14).")
+    ec = models.FloatField(
+        null=True, blank=True, help_text="Electrical conductivity (mS/cm)."
+    )
+    nitrogen = models.FloatField(null=True, blank=True, help_text="N (mg/kg).")
+    phosphorus = models.FloatField(null=True, blank=True, help_text="P (mg/kg).")
+    potassium = models.FloatField(null=True, blank=True, help_text="K (mg/kg).")
     recorded_at = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
 

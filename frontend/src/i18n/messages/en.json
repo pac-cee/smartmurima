@@ -19,7 +19,8 @@
       "grow": "Grow",
       "manage": "Manage"
     },
-    "sensors": "IoT"
+    "sensors": "IoT",
+    "devices": "Devices"
   },
   "sections": {
     "section": "Section",
@@ -187,7 +188,13 @@
     },
     "nodeAdded": "Node added",
     "nodeRemoved": "Node removed",
-    "nodeBelongs": "This node belongs to the selected section of your farm."
+    "nodeBelongs": "This node belongs to the selected section of your farm.",
+    "ph": "Soil pH",
+    "ec": "Conductivity",
+    "nitrogen": "Nitrogen (N)",
+    "phosphorus": "Phosphorus (P)",
+    "potassium": "Potassium (K)",
+    "soilChemistry": "Soil chemistry"
   },
   "farms": {
     "title": "Farms",

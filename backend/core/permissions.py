@@ -73,6 +73,20 @@ class IsOwnerOrCoop(BasePermission):
         return owner is not None and owner == user
 
 
+class IsNodeOwnerOrUnclaimed(IsOwnerOrCoop):
+    """Object access for field devices.
+
+    Same rule as ``IsOwnerOrCoop``, except a device that nobody has claimed yet
+    (``field is None``) is reachable by any authenticated user -- that is how a
+    farmer pairs a brand-new board they just powered on.
+    """
+
+    def has_object_permission(self, request, view, obj):
+        if getattr(obj, "field_id", "unset") is None:
+            return True
+        return super().has_object_permission(request, view, obj)
+
+
 def _resolve_owner(obj):
     if hasattr(obj, "get_owner_user"):
         try:

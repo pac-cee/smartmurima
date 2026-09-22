@@ -240,7 +240,13 @@ class AuthService(BaseService):
         return candidate
 
     @transaction.atomic
-    def register(self, data: dict) -> OtpIssueResult:
+    def register(self, data: dict) -> dict:
+        """Create a farmer account and sign them straight in.
+
+        Registration is deliberately single-step: no OTP, no "pending" state.
+        The account is active the moment it is created and the caller gets a
+        JWT pair back, so the client can go straight to the dashboard.
+        """
         email = data.get("email") or None
         phone = data.get("phone_number") or None
         if not email and not phone:
@@ -260,7 +266,7 @@ class AuthService(BaseService):
             full_name=data["full_name"],
             role=Role.FARMER,
             language=data.get("language", "rw"),
-            is_active=False,
+            is_active=True,
         )
         user.set_password(data["password"])
         user.save(update_fields=["password"])
@@ -271,13 +277,7 @@ class AuthService(BaseService):
         if location is not None:
             self.farmer_repo.update(farmer, location=location)
 
-        identifier = phone or email
-        return self.otp_service.issue(identifier, OtpPurpose.REGISTER, user=user)
-
-    def verify_registration(self, identifier: str, code: str) -> dict:
-        user = self.otp_service.verify(identifier, code, OtpPurpose.REGISTER)
-        if not user.is_active:
-            self.user_repo.activate(user)
+        _refresh_farmer_profile(user)
         return {"user": user, "tokens": self.tokens_for(user)}
 
     def login(self, identifier: str, password: str) -> dict:
@@ -288,7 +288,9 @@ class AuthService(BaseService):
         auth_user = authenticate(username=user.username, password=password)
         if auth_user is None:
             if not user.is_active:
-                raise ValidationError("Account not verified. Verify via OTP first.")
+                raise ValidationError(
+                    "This account has been disabled. Contact an administrator."
+                )
             raise ValidationError("Invalid credentials.")
         return {"user": auth_user, "tokens": self.tokens_for(auth_user)}
 
@@ -319,18 +321,30 @@ class AuthService(BaseService):
         user.save(update_fields=["password"])
         return user
 
-    def resend_otp(self, identifier: str, purpose: str) -> OtpIssueResult:
-        user = self.user_repo.get_by_identifier(identifier)
-        return self.otp_service.issue(identifier, purpose, user=user)
-
     def update_profile(self, user: User, data: dict) -> User:
         # ``location`` lives on the Farmer profile, not the User row.
         if "location" in data:
             farmer, _ = self.farmer_repo.get_or_create(user=user)
             self.farmer_repo.update(farmer, location=data["location"])
+            _refresh_farmer_profile(user)
 
         allowed = {"full_name", "language", "email", "phone_number"}
         updates = {k: v for k, v in data.items() if k in allowed}
         if updates:
             user = self.user_repo.update(user, **updates)
         return user
+
+
+def _refresh_farmer_profile(user: User) -> None:
+    """Drop the cached ``user.farmer_profile`` so the next read re-queries.
+
+    The ``ensure_farmer_profile`` signal creates the profile during
+    ``User.save()`` and Django caches that (location-less) instance on the user.
+    A profile updated afterwards through its own object leaves that cache stale,
+    so serializing the user would report ``location: null`` even though the row
+    was written -- which is exactly what the client then stores as the session.
+    """
+    try:
+        del user._state.fields_cache["farmer_profile"]
+    except (AttributeError, KeyError):
+        pass
